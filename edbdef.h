@@ -50,7 +50,7 @@ typedef struct EasyDatabase
     size_t *dataLens;       //每个数据的长度
     char** columnNames;     //列名
     long long dataFileOffset;       //数据在文件中开始的位置
-    void* indexhead;
+    void** indexheads;
 }EasyDatabase;
 typedef EasyDatabase EasyDB;
 #endif

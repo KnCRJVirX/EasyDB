@@ -8,6 +8,7 @@ int main(int argc, char const *argv[])
     edbCreate(".\\test.db", 3, dataType, dataLens, 1, columnNames);
     EasyDB db;
 
+
     edbOpen(".\\test.db", &db);
     printf("%s\t\t%s\t%s\n", db.columnNames[0], db.columnNames[1], db.columnNames[2]);
 
@@ -25,6 +26,7 @@ int main(int argc, char const *argv[])
     printf("\n");
     edbClose(&db);                  //关闭数据库
 
+
     edbOpen(".\\test.db", &db);     //重新打开，以测试edbClose和edbOpen
 
     printf("%s\t\t%s\t%s\n", db.columnNames[0], db.columnNames[1], db.columnNames[2]);
@@ -39,6 +41,7 @@ int main(int argc, char const *argv[])
     newBalance = 114514.1919810;
     edbInsert(&db, newLine);
     edbClose(&db);
+
 
     edbOpen(".\\test.db", &db);
 
@@ -59,6 +62,7 @@ int main(int argc, char const *argv[])
     }
     printf("\n");
     edbClose(&db);                  //关闭数据库
+
 
     edbOpen(".\\test.db", &db);     //重新打开，以测试edbClose和edbOpen
 
