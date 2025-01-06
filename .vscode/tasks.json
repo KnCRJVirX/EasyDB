@@ -57,6 +57,7 @@
                 "-static",
                 "-g",
                 ".\\easydb.c",
+                ".\\index.c",
                 "${file}",
                 "-o",
                 "${fileDirname}\\run.exe"

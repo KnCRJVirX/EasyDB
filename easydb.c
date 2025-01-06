@@ -1,6 +1,5 @@
 #include "easydb.h"
-
-
+#include "index.h"
 
 int edbCreate(const char* filename, size_t dataCount, size_t dataType[], size_t dataLens[], size_t primaryKeyIndex, char* columnNames[])
 {
@@ -63,24 +62,24 @@ int edbOpen(const char* filename, EasyDB* db)
     FILE* dbfile = fopen64(db->dbfilename, "rb+");
     if (dbfile == NULL) return FILE_OPEN_ERROR;
 
-    int readMagicNum;
+    int readMagicNum;                                                       //魔数检查
     fread(&readMagicNum, 4, 1, dbfile);
     if (readMagicNum != EDB_MAGIC_NUMBER) return MAGIC_NUMBER_ERROR;
 
-    int ver;
+    int ver;                                                                //版本号检查 
     fread(&ver, 4, 1, dbfile);
 
-    fread(&db->lineCount, EDB_INT_SIZE, 1, dbfile);
-    fread(&db->lineLen, EDB_INT_SIZE, 1, dbfile);
-    fread(&db->dataCount, EDB_INT_SIZE, 1, dbfile);
+    fread(&db->lineCount, EDB_INT_SIZE, 1, dbfile);                         //读取行数
+    fread(&db->lineLen, EDB_INT_SIZE, 1, dbfile);                           //读取行长度
+    fread(&db->dataCount, EDB_INT_SIZE, 1, dbfile);                         //读取每行数据个数
 
-    db->dataType = (size_t*)malloc(db->dataCount * sizeof(size_t));
+    db->dataType = (size_t*)malloc(db->dataCount * sizeof(size_t));         //读取一行中每个数据的类型
     fread(db->dataType, EDB_INT_SIZE, db->dataCount, dbfile);
 
-    db->dataLens = (size_t*)malloc(db->dataCount * sizeof(size_t));
+    db->dataLens = (size_t*)malloc(db->dataCount * sizeof(size_t));         //读取一行中每个数据的长度
     fread(db->dataLens, EDB_INT_SIZE, db->dataCount, dbfile);
 
-    char colNameBuf[1024];
+    char colNameBuf[1024];                                                  //读取列名
     size_t colNameLen;
     db->columnNames = (char**)malloc(db->dataCount * sizeof(char*));
     for (size_t i = 0; i < db->dataCount; i++)
@@ -96,9 +95,9 @@ int edbOpen(const char* filename, EasyDB* db)
         strcpy(db->columnNames[i], colNameBuf);
     }
 
-    fread(&db->primaryKey, EDB_INT_SIZE, 1, dbfile);
+    fread(&db->primaryKey, EDB_INT_SIZE, 1, dbfile);                        //读取主键索引
 
-    db->dataOffset = (size_t*)malloc(db->dataCount * sizeof(size_t));
+    db->dataOffset = (size_t*)malloc(db->dataCount * sizeof(size_t));       //记录文件头长度
     size_t offset = 0;
     for (size_t i = 0; i < db->dataCount; i++)
     {
@@ -122,7 +121,8 @@ int edbOpen(const char* filename, EasyDB* db)
         }
     }
 
-    db->dataFileOffset = ftello64(dbfile); //记录数据开始的位置
+    db->dataFileOffset = ftello64(dbfile);                                  //记录数据开始的位置
+    db->indexhead = NULL;
     db->head = (EDBRow*)malloc(sizeof(EDBRow));
     db->head->prev = NULL;
     db->tail = (EDBRow*)malloc(sizeof(EDBRow));
@@ -138,7 +138,7 @@ int edbOpen(const char* filename, EasyDB* db)
         ptr->prev = pre;
         ptr->id = cur_id++;
         ptr->data = (void**)malloc(db->dataCount * sizeof(void*));
-        for (size_t i = 0; i < db->dataCount; i++)
+        for (size_t i = 0; i < db->dataCount; i++)                          //读取一行中多个数据
         {
             ptr->data[i] = (void*)malloc(db->dataLens[i]);
             memcpy(ptr->data[i], rbuf + db->dataOffset[i], db->dataLens[i]);
@@ -146,17 +146,10 @@ int edbOpen(const char* filename, EasyDB* db)
         switch (db->dataType[db->primaryKey])
         {
         case EDB_TYPE_INT:
-            HashINTNode* newINTNode = (HashINTNode*)malloc(sizeof(HashINTNode));
-            newINTNode->primaryKey = *(edb_int*)(ptr->data[db->primaryKey]);
-            newINTNode->edbrow = ptr;
-            HASH_ADD_INT(HashINTMap, primaryKey, newINTNode);
+            IndexAddINT((IndexINTNode**)&db->indexhead, *(long long*)ptr->data[db->primaryKey], ptr);
             break;
         case EDB_TYPE_TEXT:
-            HashTEXTNode* newTEXTNode = (HashTEXTNode*)malloc(sizeof(HashTEXTNode));
-            newTEXTNode->primaryKey = (char*)malloc(db->dataLens[db->primaryKey]);
-            strcpy(newTEXTNode->primaryKey, (char*)ptr->data[db->primaryKey]);
-            newTEXTNode->edbrow = ptr;
-            HASH_ADD_STR(HashTEXTMap, primaryKey, newTEXTNode);
+            IndexAddTEXT((IndexTEXTNode**)&db->indexhead, (char*)ptr->data[db->primaryKey], ptr);
             break;
         default:
             break;
@@ -175,18 +168,16 @@ int edbOpen(const char* filename, EasyDB* db)
 int edbInsert(EasyDB *db, void* row[])
 {
     if (db == NULL || row == NULL) return NULL_PTR_ERROR;
-    
+    int retval = 0;
     switch (db->dataType[db->primaryKey])
     {
     case EDB_TYPE_INT:
-        HashINTNode *INTnode = NULL;
-        HASH_FIND_INT(HashINTMap, (edb_int*)row[db->primaryKey], INTnode);
-        if (INTnode) return PRIMARY_KEY_NOT_UNIQUE;
+        retval = IndexFindINT((IndexINTNode**)&db->indexhead, *(long long*)row[db->primaryKey], NULL, 0);
+        if (retval) return PRIMARY_KEY_NOT_UNIQUE;
         break;
     case EDB_TYPE_TEXT:
-        HashTEXTNode *TEXTnode = NULL;
-        HASH_FIND_STR(HashTEXTMap, (char*)row[db->primaryKey], TEXTnode);
-        if (TEXTnode) return PRIMARY_KEY_NOT_UNIQUE;
+        retval = IndexFindTEXT((IndexTEXTNode**)&db->indexhead, (char*)row[db->primaryKey], NULL, 0);
+        if (retval) return PRIMARY_KEY_NOT_UNIQUE;
         break;
     default:
         break;
@@ -212,17 +203,10 @@ int edbInsert(EasyDB *db, void* row[])
     switch (db->dataType[db->primaryKey])
     {
         case EDB_TYPE_INT:
-            HashINTNode* newINTNode = (HashINTNode*)malloc(sizeof(HashINTNode));
-            newINTNode->primaryKey = *(edb_int*)(ptr->data[db->primaryKey]);
-            newINTNode->edbrow = ptr;
-            HASH_ADD_INT(HashINTMap, primaryKey, newINTNode);
+            IndexAddINT((IndexINTNode**)&db->indexhead, *(long long*)ptr->data[db->primaryKey], ptr);
             break;
         case EDB_TYPE_TEXT:
-            HashTEXTNode* newTEXTNode = (HashTEXTNode*)malloc(sizeof(HashTEXTNode));
-            newTEXTNode->primaryKey = (char*)malloc(db->dataLens[db->primaryKey]);
-            strcpy(newTEXTNode->primaryKey, (char*)ptr->data[db->primaryKey]);
-            newTEXTNode->edbrow = ptr;
-            HASH_ADD_STR(HashTEXTMap, primaryKey, newTEXTNode);
+            IndexAddTEXT((IndexTEXTNode**)&db->indexhead, (char*)ptr->data[db->primaryKey], ptr);
             break;
         default:
             break;
@@ -244,9 +228,11 @@ int edbDelete(EasyDB *db, EDBRow* row)
     switch (db->dataType[db->primaryKey])
     {
     case EDB_TYPE_INT:
-        HASH_DEL(HashINTMap, row);
+        IndexDelINT((IndexINTNode**)&db->indexhead, *(long long*)row->data[db->primaryKey], row);
         break;
-    
+    case EDB_TYPE_TEXT:
+        IndexDelTEXT((IndexTEXTNode**)&db->indexhead, (char*)row->data[db->primaryKey], row);
+        break;
     default:
         break;
     }

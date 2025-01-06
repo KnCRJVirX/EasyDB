@@ -29,6 +29,8 @@ typedef struct ListNode
     size_t id;
     void* primaryKey;
     void** data;
+    struct ListNode *prev;
+    struct ListNode *next;
     UT_hash_handle hh;
 }ListNode;
 typedef ListNode EDBRow;
@@ -36,7 +38,9 @@ typedef ListNode EDBRow;
 typedef struct EasyDatabase
 {
     char dbfilename[256];
-    EDBRow* HashMapHead;
+    EDBRow* head;
+    EDBRow* tail;
+    EDBRow* tmpptr;
     size_t lineCount;
     size_t lineLen;         //一行的长度
     size_t dataCount;       //每行有几个数据
@@ -46,6 +50,7 @@ typedef struct EasyDatabase
     size_t *dataLens;       //每个数据的长度
     char** columnNames;     //列名
     long long dataFileOffset;       //数据在文件中开始的位置
+    void* indexhead;
 }EasyDatabase;
 typedef EasyDatabase EasyDB;
 #endif
