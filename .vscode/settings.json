@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "easydb.h": "c",
+        "edbdef.h": "c",
+        "stdio.h": "c",
+        "stdlib.h": "c"
+    }
+}
