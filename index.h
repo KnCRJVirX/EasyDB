@@ -20,9 +20,9 @@ typedef struct IndexTEXTNode
     UT_hash_handle hh;
 }IndexTEXTNode;
 
-int IndexAddINT(IndexINTNode** head, long long inKey, void* data);
+int IndexAddINT(IndexINTNode** head, edb_int inKey, void* data);
 int IndexAddTEXT(IndexTEXTNode** head, char* inKey, void* data);
-int IndexFindINT(IndexINTNode** head, long long inKey, EDBRow** findResult, size_t len);
-int IndexFindTEXT(IndexTEXTNode** head, char* inKey, EDBRow** findResult, size_t len);
-int IndexDelINT(IndexINTNode** head, long long inKey, void* data_ptr);
+int IndexFindINT(IndexINTNode** head, edb_int inKey, void** findResult, size_t len);
+int IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResult, size_t len);
+int IndexDelINT(IndexINTNode** head, edb_int inKey, void* data_ptr);
 int IndexDelTEXT(IndexTEXTNode** head, char* inKey, void* data_ptr);

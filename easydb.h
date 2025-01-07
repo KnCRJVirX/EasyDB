@@ -27,4 +27,4 @@ int edbClose(EasyDB *db);
 
 int edbInsert(EasyDB *db, void* row[]);
 int edbDelete(EasyDB *db, EDBRow* row);
-int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexRes);
+int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, void*** indexRes);

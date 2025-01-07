@@ -19,10 +19,11 @@ typedef double edb_real;
 #define EDB_TYPE_BLOB 2
 #define EDB_TYPE_TEXT 9
 
-#define FILE_OPEN_ERROR -1          //文件打开错误
-#define MAGIC_NUMBER_ERROR -2       //魔数错误（非EasyDB数据库文件）
-#define NULL_PTR_ERROR -3           //空指针错误
-#define PRIMARY_KEY_NOT_UNIQUE -4   //主键重复
+#define FILE_OPEN_ERROR -1                  //文件打开错误
+#define MAGIC_NUMBER_ERROR -2               //魔数错误（非EasyDB数据库文件）
+#define NULL_PTR_ERROR -3                   //空指针错误
+#define PRIMARY_KEY_NOT_UNIQUE -4           //主键重复
+#define PRIMARY_KEY_TYPE_CANNOT_INDEX -5    //仅支持整数和文本的索引
 
 typedef struct ListNode
 {

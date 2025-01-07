@@ -4,6 +4,7 @@
 int edbCreate(const char* filename, size_t columnCount, size_t dataType[], size_t dataLens[], size_t primaryKeyIndex, char* columnNames[])
 {
     if (filename == NULL) return NULL_PTR_ERROR;
+    if (dataType[primaryKeyIndex] != EDB_TYPE_INT && dataType[primaryKeyIndex] != EDB_TYPE_TEXT) return PRIMARY_KEY_TYPE_CANNOT_INDEX;
     
     FILE* dbfile = fopen64(filename, "wb+");
     if (dbfile == NULL) return FILE_OPEN_ERROR;
@@ -144,14 +145,29 @@ int edbOpen(const char* filename, EasyDB* db)
         {
             ptr->data[i] = (void*)malloc(db->dataLens[i]);
             memcpy(ptr->data[i], rbuf + db->dataOffset[i], db->dataLens[i]);
+            if (i != db->primaryKey)                                          //非主键的情况下，将数据插入索引
+            {
+                switch (db->dataType[i])
+                {
+                case EDB_TYPE_INT:
+                    IndexAddINT((IndexINTNode**)&db->indexheads[i], *(edb_int*)ptr->data[i], ptr->data);
+                    break;
+                case EDB_TYPE_TEXT:
+                    IndexAddTEXT((IndexTEXTNode**)&db->indexheads[i], (char*)ptr->data[i], ptr->data);
+                    break;
+                default:
+                    break;
+                }
+            }
+            
         }
         switch (db->dataType[db->primaryKey])
         {
         case EDB_TYPE_INT:
-            IndexAddINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(long long*)ptr->data[db->primaryKey], ptr);
+            IndexAddINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(edb_int*)ptr->data[db->primaryKey], ptr->data);
             break;
         case EDB_TYPE_TEXT:
-            IndexAddTEXT((IndexTEXTNode**)&db->indexheads[db->primaryKey], (char*)ptr->data[db->primaryKey], ptr);
+            IndexAddTEXT((IndexTEXTNode**)&db->indexheads[db->primaryKey], (char*)ptr->data[db->primaryKey], ptr->data);
             break;
         default:
             break;
@@ -174,7 +190,7 @@ int edbInsert(EasyDB *db, void* row[])
     switch (db->dataType[db->primaryKey])
     {
     case EDB_TYPE_INT:
-        retval = IndexFindINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(long long*)row[db->primaryKey], NULL, 0);
+        retval = IndexFindINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(edb_int*)row[db->primaryKey], NULL, 0);
         if (retval) return PRIMARY_KEY_NOT_UNIQUE;
         break;
     case EDB_TYPE_TEXT:
@@ -205,10 +221,10 @@ int edbInsert(EasyDB *db, void* row[])
     switch (db->dataType[db->primaryKey])
     {
         case EDB_TYPE_INT:
-            IndexAddINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(long long*)ptr->data[db->primaryKey], ptr);
+            IndexAddINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(edb_int*)ptr->data[db->primaryKey], ptr->data);
             break;
         case EDB_TYPE_TEXT:
-            IndexAddTEXT((IndexTEXTNode**)&db->indexheads[db->primaryKey], (char*)ptr->data[db->primaryKey], ptr);
+            IndexAddTEXT((IndexTEXTNode**)&db->indexheads[db->primaryKey], (char*)ptr->data[db->primaryKey], ptr->data);
             break;
         default:
             break;
@@ -227,17 +243,21 @@ int edbDelete(EasyDB *db, EDBRow* row)
     pre->next = row->next;
     next->prev = row->prev;
     
-    switch (db->dataType[db->primaryKey])
+    for (size_t i = 0; i < db->columnCount; i++)
     {
-    case EDB_TYPE_INT:
-        IndexDelINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(long long*)row->data[db->primaryKey], row);
-        break;
-    case EDB_TYPE_TEXT:
-        IndexDelTEXT((IndexTEXTNode**)&db->indexheads[db->primaryKey], (char*)row->data[db->primaryKey], row);
-        break;
-    default:
-        break;
+        switch (db->dataType[i])
+        {
+        case EDB_TYPE_INT:
+            IndexDelINT((IndexINTNode**)&db->indexheads[i], *(edb_int*)row->data[i], row->data);
+            break;
+        case EDB_TYPE_TEXT:
+            IndexDelTEXT((IndexTEXTNode**)&db->indexheads[i], (char*)row->data[i], row->data);
+            break;
+        default:
+            break;
+        }
     }
+    
     for (size_t i = 0; i < db->columnCount; i++)
     {
         free(row->data[i]);
@@ -247,25 +267,25 @@ int edbDelete(EasyDB *db, EDBRow* row)
     return 0;
 }
 
-int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexRes)
+int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, void*** indexResult)
 {
     int retval = 0;
-    EDBRow* findRes;
+    void** findRes;
     switch (db->dataType[db->primaryKey])
     {
     case EDB_TYPE_INT:
         findRes = NULL;
-        retval = IndexFindINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(long long*)primaryKey, &findRes, 1);
+        retval = IndexFindINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(edb_int*)primaryKey, (void**)&findRes, 1);
         break;
     case EDB_TYPE_TEXT:
         findRes = NULL;
-        retval = IndexFindTEXT((IndexTEXTNode**)&db->indexheads[db->primaryKey], (char*)primaryKey, &findRes, 1);
+        retval = IndexFindTEXT((IndexTEXTNode**)&db->indexheads[db->primaryKey], (char*)primaryKey, (void**)&findRes, 1);
         break;
     default:
-        return -1;
+        return PRIMARY_KEY_TYPE_CANNOT_INDEX;
         break;
     }
-    *indexRes = findRes;
+    *indexResult = findRes;
     return 0;
 }
 

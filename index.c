@@ -1,6 +1,6 @@
 #include "index.h"
 
-int IndexAddINT(IndexINTNode** head, long long inKey, void* data)
+int IndexAddINT(IndexINTNode** head, edb_int inKey, void* data)
 {
     IndexINTNode* newNode = (IndexINTNode*)malloc(sizeof(IndexINTNode));
     newNode->key = inKey;
@@ -16,6 +16,7 @@ int IndexAddINT(IndexINTNode** head, long long inKey, void* data)
     {
         findNode->next = newNode;
     }
+    return 0;
 }
 
 int IndexAddTEXT(IndexTEXTNode** head, char* inKey, void* data)
@@ -34,9 +35,10 @@ int IndexAddTEXT(IndexTEXTNode** head, char* inKey, void* data)
     {
         findNode->next = newNode;
     }
+    return 0;
 }
 
-int IndexFindINT(IndexINTNode** head, long long inKey, EDBRow** findResult, size_t len)
+int IndexFindINT(IndexINTNode** head, edb_int inKey, void** findResult, size_t len)
 {
     IndexINTNode* findNode = NULL;
     HASH_FIND_INT(*head, &inKey, findNode);
@@ -55,9 +57,10 @@ int IndexFindINT(IndexINTNode** head, long long inKey, EDBRow** findResult, size
         }
         return count;
     }
+    return 0;
 }
 
-int IndexFindTEXT(IndexTEXTNode** head, char* inKey, EDBRow** findResult, size_t len)
+int IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResult, size_t len)
 {
     IndexTEXTNode* findNode = NULL;
     HASH_FIND_STR(*head, inKey, findNode);
@@ -76,9 +79,10 @@ int IndexFindTEXT(IndexTEXTNode** head, char* inKey, EDBRow** findResult, size_t
         }
         return count;
     }
+    return 0;
 }
 
-int IndexDelINT(IndexINTNode** head, long long inKey, void* data_ptr)
+int IndexDelINT(IndexINTNode** head, edb_int inKey, void* data_ptr)
 {
     IndexINTNode* findNode = NULL;
     HASH_FIND_INT(*head, &inKey, findNode);
@@ -113,6 +117,7 @@ int IndexDelINT(IndexINTNode** head, long long inKey, void* data_ptr)
             findNode = findNode->next;
         }
     }
+    return 0;
 }
 
 int IndexDelTEXT(IndexTEXTNode** head, char* inKey, void* data_ptr)
@@ -150,4 +155,5 @@ int IndexDelTEXT(IndexTEXTNode** head, char* inKey, void* data_ptr)
             findNode = findNode->next;
         }
     }
+    return 0;
 }
