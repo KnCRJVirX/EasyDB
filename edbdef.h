@@ -24,6 +24,7 @@ typedef double edb_real;
 #define NULL_PTR_ERROR -3                   //空指针错误
 #define PRIMARY_KEY_NOT_UNIQUE -4           //主键重复
 #define PRIMARY_KEY_TYPE_CANNOT_INDEX -5    //仅支持整数和文本的索引
+#define TYPE_CANNOT_INDEX -6                //仅支持整数和文本的索引
 
 typedef struct ListNode
 {
@@ -46,7 +47,7 @@ typedef struct EasyDatabase
     size_t columnCount;       //每行有几个数据
     size_t primaryKey;      //主键在一行中的索引
     size_t *dataOffset;     //每个数据相比行首的偏移量
-    size_t *dataType;       //每个数据的类型，>=9即为TEXT类型，数值即为TEXT+长度
+    size_t *dataTypes;       //每个数据的类型，>=9即为TEXT类型，数值即为TEXT+长度
     size_t *dataLens;       //每个数据的长度
     char** columnNames;     //列名
     long long dataFileOffset;       //数据在文件中开始的位置

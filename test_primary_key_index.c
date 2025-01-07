@@ -6,7 +6,7 @@
 int main(int argc, char const *argv[])
 {
     const char* filename1 = ".\\test_primary_key_1.db";
-    size_t dataType[] = {EDB_TYPE_INT, EDB_TYPE_TEXT, EDB_TYPE_REAL};
+    size_t dataTypes[] = {EDB_TYPE_INT, EDB_TYPE_TEXT, EDB_TYPE_REAL};
     size_t dataLenths[] = {0, 50, 0};
     char* colNames[] = {"ID", "Name", "Balance"};
     
@@ -16,7 +16,7 @@ int main(int argc, char const *argv[])
     retval = edbOpen(filename1, &db1);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(filename1, 3, dataType, dataLenths, 0, colNames);
+        edbCreate(filename1, 3, dataTypes, dataLenths, 0, colNames);
         edbOpen(filename1, &db1);
         size_t dataCount;
         printf("How many data you want to padding: ");
@@ -78,7 +78,7 @@ int main(int argc, char const *argv[])
     retval = edbOpen(filename2, &db2);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(filename2, 3, dataType, dataLenths, 1, colNames);
+        edbCreate(filename2, 3, dataTypes, dataLenths, 1, colNames);
         edbOpen(filename2, &db2);
         size_t dataCount;
         printf("How many data you want to padding: ");

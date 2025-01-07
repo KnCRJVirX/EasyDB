@@ -1,6 +1,6 @@
 #include "index.h"
 
-int IndexAddINT(IndexINTNode** head, edb_int inKey, void* data)
+int IndexInsertINT(IndexINTNode** head, edb_int inKey, void* data)
 {
     IndexINTNode* newNode = (IndexINTNode*)malloc(sizeof(IndexINTNode));
     newNode->key = inKey;
@@ -19,7 +19,7 @@ int IndexAddINT(IndexINTNode** head, edb_int inKey, void* data)
     return 0;
 }
 
-int IndexAddTEXT(IndexTEXTNode** head, char* inKey, void* data)
+int IndexInsertTEXT(IndexTEXTNode** head, char* inKey, void* data)
 {
     IndexTEXTNode* newNode = (IndexTEXTNode*)malloc(sizeof(IndexTEXTNode));
     newNode->key = inKey;
@@ -29,7 +29,7 @@ int IndexAddTEXT(IndexTEXTNode** head, char* inKey, void* data)
     HASH_FIND_STR(*head, inKey, findNode);
     if (findNode == NULL)
     {
-        HASH_ADD_STR(*head, key, newNode);
+        HASH_ADD_KEYPTR(hh, *head, newNode->key, strlen(newNode->key), newNode);
     }
     else
     {
@@ -38,7 +38,27 @@ int IndexAddTEXT(IndexTEXTNode** head, char* inKey, void* data)
     return 0;
 }
 
-int IndexFindINT(IndexINTNode** head, edb_int inKey, void** findResult, size_t len)
+// int IndexInsert(IndexNode** head, void* inKey, size_t keyLenth, void* data)
+// {
+    
+//     IndexNode* newNode = (IndexNode*)malloc(sizeof(IndexNode));
+//     newNode->key = inKey;
+//     newNode->data = data;
+//     newNode->next = NULL;
+//     IndexTEXTNode* findNode = NULL;
+//     HASH_FIND_STR(*head, inKey, findNode);
+//     if (findNode == NULL)
+//     {
+//         HASH_ADD_STR(*head, key, newNode);
+//     }
+//     else
+//     {
+//         findNode->next = newNode;
+//     }
+//     return 0;
+// }
+
+size_t IndexFindINT(IndexINTNode** head, edb_int inKey, void** findResults, size_t len)
 {
     IndexINTNode* findNode = NULL;
     HASH_FIND_INT(*head, &inKey, findNode);
@@ -49,10 +69,10 @@ int IndexFindINT(IndexINTNode** head, edb_int inKey, void** findResult, size_t l
     }
     else
     {
-        if (findResult == NULL || len == 0) return 1;
+        if (findResults == NULL || len == 0) return 1;
         while (findNode != NULL && count < len)
         {
-            findResult[count++] = findNode->data;
+            findResults[count++] = findNode->data;
             findNode = findNode->next;
         }
         return count;
@@ -60,7 +80,7 @@ int IndexFindINT(IndexINTNode** head, edb_int inKey, void** findResult, size_t l
     return 0;
 }
 
-int IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResult, size_t len)
+size_t IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResults, size_t len)
 {
     IndexTEXTNode* findNode = NULL;
     HASH_FIND_STR(*head, inKey, findNode);
@@ -71,10 +91,10 @@ int IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResult, size_t l
     }
     else
     {
-        if (findResult == NULL || len == 0) return 1;
+        if (findResults == NULL || len == 0) return 1;
         while (findNode != NULL && count < len)
         {
-            findResult[count++] = findNode->data;
+            findResults[count++] = findNode->data;
             findNode = findNode->next;
         }
         return count;
