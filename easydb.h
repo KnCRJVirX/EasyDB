@@ -21,8 +21,10 @@ int compareInts(const void *a, const void *b);
 // int search(int line_count, struct person addressbook[BOOK_MAX_SIZE], int index_list[BOOK_MAX_SIZE]);
 // int randomData(int *line_count, struct person addressbook[BOOK_MAX_SIZE]);
 
-int edbCreate(const char* filename, size_t dataCount, size_t dataType[], size_t dataLens[], size_t primaryKeyIndex, char* columnNames[]);
+int edbCreate(const char* filename, size_t columnCount, size_t dataType[], size_t dataLens[], size_t primaryKeyIndex, char* columnNames[]);
 int edbOpen(const char* filename, EasyDB* db);
+int edbClose(EasyDB *db);
+
 int edbInsert(EasyDB *db, void* row[]);
 int edbDelete(EasyDB *db, EDBRow* row);
-int edbClose(EasyDB *db);
+int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexRes);

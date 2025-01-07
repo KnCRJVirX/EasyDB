@@ -36,7 +36,7 @@ int IndexAddTEXT(IndexTEXTNode** head, char* inKey, void* data)
     }
 }
 
-int IndexFindINT(IndexINTNode** head, long long inKey, void** findResult, size_t len)
+int IndexFindINT(IndexINTNode** head, long long inKey, EDBRow** findResult, size_t len)
 {
     IndexINTNode* findNode = NULL;
     HASH_FIND_INT(*head, &inKey, findNode);
@@ -57,7 +57,7 @@ int IndexFindINT(IndexINTNode** head, long long inKey, void** findResult, size_t
     }
 }
 
-int IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResult, size_t len)
+int IndexFindTEXT(IndexTEXTNode** head, char* inKey, EDBRow** findResult, size_t len)
 {
     IndexTEXTNode* findNode = NULL;
     HASH_FIND_STR(*head, inKey, findNode);

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "edbdef.h"
 #include "src/uthash.h"
 
 #define NODE_NOT_EXIST -1
@@ -21,7 +22,7 @@ typedef struct IndexTEXTNode
 
 int IndexAddINT(IndexINTNode** head, long long inKey, void* data);
 int IndexAddTEXT(IndexTEXTNode** head, char* inKey, void* data);
-int IndexFindINT(IndexINTNode** head, long long inKey, void** findResult, size_t len);
-int IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResult, size_t len);
+int IndexFindINT(IndexINTNode** head, long long inKey, EDBRow** findResult, size_t len);
+int IndexFindTEXT(IndexTEXTNode** head, char* inKey, EDBRow** findResult, size_t len);
 int IndexDelINT(IndexINTNode** head, long long inKey, void* data_ptr);
 int IndexDelTEXT(IndexTEXTNode** head, char* inKey, void* data_ptr);

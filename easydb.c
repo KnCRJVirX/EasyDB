@@ -1,7 +1,7 @@
 #include "easydb.h"
 #include "index.h"
 
-int edbCreate(const char* filename, size_t dataCount, size_t dataType[], size_t dataLens[], size_t primaryKeyIndex, char* columnNames[])
+int edbCreate(const char* filename, size_t columnCount, size_t dataType[], size_t dataLens[], size_t primaryKeyIndex, char* columnNames[])
 {
     if (filename == NULL) return NULL_PTR_ERROR;
     
@@ -18,7 +18,7 @@ int edbCreate(const char* filename, size_t dataCount, size_t dataType[], size_t 
     fwrite(&emptyLineCount, EDB_INT_SIZE, 1, dbfile);
 
     size_t lineLen = 0;
-    for (size_t i = 0; i < dataCount; i++)
+    for (size_t i = 0; i < columnCount; i++)
     {
         switch (dataType[i])
         {
@@ -42,10 +42,10 @@ int edbCreate(const char* filename, size_t dataCount, size_t dataType[], size_t 
     }
     fwrite(&lineLen, EDB_INT_SIZE, 1, dbfile);
 
-    fwrite(&dataCount, EDB_INT_SIZE, 1, dbfile);
-    fwrite(dataType, EDB_INT_SIZE, dataCount, dbfile);
-    fwrite(dataLens, EDB_INT_SIZE, dataCount, dbfile);
-    for (size_t i = 0; i < dataCount; i++)
+    fwrite(&columnCount, EDB_INT_SIZE, 1, dbfile);
+    fwrite(dataType, EDB_INT_SIZE, columnCount, dbfile);
+    fwrite(dataLens, EDB_INT_SIZE, columnCount, dbfile);
+    for (size_t i = 0; i < columnCount; i++)
     {
         fwrite(columnNames[i], sizeof(char), strlen(columnNames[i]) + 1, dbfile); //+1是为了把结束符也写入文件
     }
@@ -71,18 +71,18 @@ int edbOpen(const char* filename, EasyDB* db)
 
     fread(&db->lineCount, EDB_INT_SIZE, 1, dbfile);                         //读取行数
     fread(&db->lineLen, EDB_INT_SIZE, 1, dbfile);                           //读取行长度
-    fread(&db->dataCount, EDB_INT_SIZE, 1, dbfile);                         //读取每行数据个数
+    fread(&db->columnCount, EDB_INT_SIZE, 1, dbfile);                         //读取每行数据个数
 
-    db->dataType = (size_t*)malloc(db->dataCount * sizeof(size_t));         //读取一行中每个数据的类型
-    fread(db->dataType, EDB_INT_SIZE, db->dataCount, dbfile);
+    db->dataType = (size_t*)malloc(db->columnCount * sizeof(size_t));         //读取一行中每个数据的类型
+    fread(db->dataType, EDB_INT_SIZE, db->columnCount, dbfile);
 
-    db->dataLens = (size_t*)malloc(db->dataCount * sizeof(size_t));         //读取一行中每个数据的长度
-    fread(db->dataLens, EDB_INT_SIZE, db->dataCount, dbfile);
+    db->dataLens = (size_t*)malloc(db->columnCount * sizeof(size_t));         //读取一行中每个数据的长度
+    fread(db->dataLens, EDB_INT_SIZE, db->columnCount, dbfile);
 
     char colNameBuf[1024];                                                  //读取列名
     size_t colNameLen;
-    db->columnNames = (char**)malloc(db->dataCount * sizeof(char*));
-    for (size_t i = 0; i < db->dataCount; i++)
+    db->columnNames = (char**)malloc(db->columnCount * sizeof(char*));
+    for (size_t i = 0; i < db->columnCount; i++)
     {
         colNameLen = 0;
         char c;
@@ -97,9 +97,9 @@ int edbOpen(const char* filename, EasyDB* db)
 
     fread(&db->primaryKey, EDB_INT_SIZE, 1, dbfile);                        //读取主键索引
 
-    db->dataOffset = (size_t*)malloc(db->dataCount * sizeof(size_t));       //记录文件头长度
+    db->dataOffset = (size_t*)malloc(db->columnCount * sizeof(size_t));       //记录文件头长度
     size_t offset = 0;
-    for (size_t i = 0; i < db->dataCount; i++)
+    for (size_t i = 0; i < db->columnCount; i++)
     {
         db->dataOffset[i] = offset;
         switch (db->dataType[i])
@@ -123,7 +123,7 @@ int edbOpen(const char* filename, EasyDB* db)
 
     db->dataFileOffset = ftello64(dbfile);                                  //记录数据开始的位置
 
-    db->indexheads = calloc(db->dataCount, sizeof(void*));                 //初始化索引表头指针
+    db->indexheads = calloc(db->columnCount, sizeof(void*));                 //初始化索引表头指针
 
     db->head = (EDBRow*)malloc(sizeof(EDBRow));
     db->head->prev = NULL;
@@ -139,8 +139,8 @@ int edbOpen(const char* filename, EasyDB* db)
         ptr = ptr->next;
         ptr->prev = pre;
         ptr->id = cur_id++;
-        ptr->data = (void**)malloc(db->dataCount * sizeof(void*));
-        for (size_t i = 0; i < db->dataCount; i++)                          //读取一行中多个数据
+        ptr->data = (void**)malloc(db->columnCount * sizeof(void*));
+        for (size_t i = 0; i < db->columnCount; i++)                          //读取一行中多个数据
         {
             ptr->data[i] = (void*)malloc(db->dataLens[i]);
             memcpy(ptr->data[i], rbuf + db->dataOffset[i], db->dataLens[i]);
@@ -195,8 +195,8 @@ int edbInsert(EasyDB *db, void* row[])
     db->tail->prev = ptr;
     db->tmpptr = ptr;
 
-    ptr->data = (void**)malloc(db->dataCount * sizeof(void*));
-    for (size_t i = 0; i < db->dataCount; i++)
+    ptr->data = (void**)malloc(db->columnCount * sizeof(void*));
+    for (size_t i = 0; i < db->columnCount; i++)
     {
         ptr->data[i] = (void*)calloc(db->dataLens[i], 1);
         if (db->dataType[i] >= EDB_TYPE_TEXT) strcpy(ptr->data[i], row[i]);
@@ -238,12 +238,34 @@ int edbDelete(EasyDB *db, EDBRow* row)
     default:
         break;
     }
-    for (size_t i = 0; i < db->dataCount; i++)
+    for (size_t i = 0; i < db->columnCount; i++)
     {
         free(row->data[i]);
     }
     free(row->data);
     free(row);
+    return 0;
+}
+
+int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexRes)
+{
+    int retval = 0;
+    EDBRow* findRes;
+    switch (db->dataType[db->primaryKey])
+    {
+    case EDB_TYPE_INT:
+        findRes = NULL;
+        retval = IndexFindINT((IndexINTNode**)&db->indexheads[db->primaryKey], *(long long*)primaryKey, &findRes, 1);
+        break;
+    case EDB_TYPE_TEXT:
+        findRes = NULL;
+        retval = IndexFindTEXT((IndexTEXTNode**)&db->indexheads[db->primaryKey], (char*)primaryKey, &findRes, 1);
+        break;
+    default:
+        return -1;
+        break;
+    }
+    *indexRes = findRes;
     return 0;
 }
 
@@ -262,7 +284,7 @@ int edbClose(EasyDB *db)
     ptr = ptr->next;
     for (size_t i = 0; i < db->lineCount && ptr != db->tail; i++)
     {
-        for (size_t j = 0; j < db->dataCount; j++)
+        for (size_t j = 0; j < db->columnCount; j++)
         {
             fwrite(ptr->data[j], 1, db->dataLens[j], dbfile);
             free(ptr->data[j]);
@@ -274,7 +296,7 @@ int edbClose(EasyDB *db)
     }
     free(ptr);
 
-    for (size_t i = 0; i < db->dataCount; i++) free(db->columnNames[i]);
+    for (size_t i = 0; i < db->columnCount; i++) free(db->columnNames[i]);
     free(db->columnNames);
     free(db->dataType);
     free(db->dataOffset);

@@ -27,7 +27,6 @@ typedef double edb_real;
 typedef struct ListNode
 {
     size_t id;
-    void* primaryKey;
     void** data;
     struct ListNode *prev;
     struct ListNode *next;
@@ -43,7 +42,7 @@ typedef struct EasyDatabase
     EDBRow* tmpptr;
     size_t lineCount;
     size_t lineLen;         //一行的长度
-    size_t dataCount;       //每行有几个数据
+    size_t columnCount;       //每行有几个数据
     size_t primaryKey;      //主键在一行中的索引
     size_t *dataOffset;     //每个数据相比行首的偏移量
     size_t *dataType;       //每个数据的类型，>=9即为TEXT类型，数值即为TEXT+长度
