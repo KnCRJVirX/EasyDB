@@ -1,7 +1,6 @@
 #include "easydb.h"
 #include "index.h"
-
-int edbCreate(const char* filename, size_t columnCount, size_t dataTypes[], size_t dataLens[], size_t primaryKeyIndex, char* columnNames[])
+int edbCreate(const char* filename, size_t columnCount, size_t primaryKeyIndex, size_t dataTypes[], size_t dataLens[], char* columnNames[])
 {
     if (filename == NULL) return NULL_PTR_ERROR;
     if (dataTypes[primaryKeyIndex] != EDB_TYPE_INT && dataTypes[primaryKeyIndex] != EDB_TYPE_TEXT) return PRIMARY_KEY_TYPE_CANNOT_INDEX;

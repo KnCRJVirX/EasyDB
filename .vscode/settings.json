@@ -5,6 +5,7 @@
         "stdio.h": "c",
         "stdlib.h": "c",
         "stdbool.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "time.h": "c"
     }
 }

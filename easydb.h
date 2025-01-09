@@ -20,8 +20,10 @@ int compareInts(const void *a, const void *b);
 // int edit(int line_count, struct person addressbook[BOOK_MAX_SIZE]);
 // int search(int line_count, struct person addressbook[BOOK_MAX_SIZE], int index_list[BOOK_MAX_SIZE]);
 // int randomData(int *line_count, struct person addressbook[BOOK_MAX_SIZE]);
+int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult);
+int edbNodeDelete(EasyDB *db, EDBRow* row);
 
-int edbCreate(const char* filename, size_t columnCount, size_t dataTypes[], size_t dataLens[], size_t primaryKeyIndex, char* columnNames[]);
+int edbCreate(const char* filename, size_t columnCount, size_t primaryKeyIndex, size_t dataTypes[], size_t dataLens[], char* columnNames[]);
 int edbOpen(const char* filename, EasyDB* db);
 int edbClose(EasyDB *db);
 
@@ -29,8 +31,5 @@ int edbInsert(EasyDB *db, void* row[]);
 int edbDelete(EasyDB *db, void* primaryKey);
 size_t edbWhere(EasyDB *db, size_t columnIndex, void* inKey, void*** indexResults, size_t maxResultNumber);
 int edbUpdate(EasyDB *db, void* primaryKey, size_t updateColumnIndex, void* newData);
-
-int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult);
-int edbNodeDelete(EasyDB *db, EDBRow* row);
 
 size_t columnNameToColumnIndex(EasyDB *db, char *columnName);

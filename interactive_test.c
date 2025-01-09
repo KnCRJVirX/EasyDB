@@ -18,7 +18,7 @@ int main(int argc, char const *argv[])
     int retval = edbOpen(dbfilename, &db);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(dbfilename, 3, dataTypes, dataLenths, 0, colNames);
+        edbCreate(dbfilename, 3, 0, dataTypes, dataLenths, colNames);
         edbOpen(dbfilename, &db);
     }
     
