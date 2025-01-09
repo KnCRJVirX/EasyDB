@@ -14,6 +14,7 @@ int IndexInsertINT(IndexINTNode** head, edb_int inKey, void* data)
     }
     else
     {
+        newNode->next = findNode->next;
         findNode->next = newNode;
     }
     return 0;
@@ -33,6 +34,7 @@ int IndexInsertTEXT(IndexTEXTNode** head, char* inKey, void* data)
     }
     else
     {
+        newNode->next = findNode->next;
         findNode->next = newNode;
     }
     return 0;
@@ -160,7 +162,7 @@ int IndexDelTEXT(IndexTEXTNode** head, char* inKey, void* data_ptr)
         {
             IndexTEXTNode* newNode = findNode->next;
             HASH_DEL(*head, findNode);
-            HASH_ADD_INT(*head, key, newNode);
+            HASH_ADD_KEYPTR(hh, *head, newNode->key, strlen(newNode->key), newNode);
             return 0;
         }
         while (findNode->next != NULL)

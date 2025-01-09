@@ -26,6 +26,7 @@ int main(int argc, char const *argv[])
     char inColName[30];
     char buf[50];
     edb_int tmpInputID;
+    double tmpInputBalance;
     void** indexResults[10];
     size_t findCount;
 
@@ -33,6 +34,7 @@ int main(int argc, char const *argv[])
     char newName[30];
     double newBalance;
     void* newRow[] = {&newID, newName, &newBalance};
+    size_t columnIndex;
 
     // IndexTEXTNode *ptr1, *ptr2;
     // HASH_ITER(hh, (IndexTEXTNode*)db.indexheads[1], ptr1, ptr2){
@@ -57,31 +59,18 @@ int main(int argc, char const *argv[])
             }
             printf("\n");
         }
-        else if (!strcmp(command, "index"))
+        else if (!strcmp(command, "index") || !strcmp(command, "select"))
         {
             scanf("%s %s", inColName, buf);
-            int indexCol = -1;
-            for (size_t i = 0; i < db.columnCount; i++)
-            {
-                if (!strcmp(inColName, db.columnNames[i]))
-                {
-                    indexCol = i;
-                    break;
-                }
-            }
-            if (indexCol == -1)
-            {
-                printf("Not this column!\n");
-                continue;
-            }
-            switch (db.dataTypes[indexCol])
+            columnIndex = columnNameToColumnIndex(&db, inColName);
+            switch (db.dataTypes[columnIndex])
             {
             case EDB_TYPE_INT:
                 tmpInputID = atoll(buf);
-                findCount = edbIndex(&db, indexCol, &tmpInputID, indexResults, 10);
+                findCount = edbWhere(&db, columnIndex, &tmpInputID, indexResults, 10);
                 break;
             case EDB_TYPE_TEXT:
-                findCount = edbIndex(&db, indexCol, buf, indexResults, 10);
+                findCount = edbWhere(&db, columnIndex, buf, indexResults, 10);
                 break;
             default:
                 break;
@@ -95,6 +84,45 @@ int main(int argc, char const *argv[])
             {
                 printf("%d\t%-15s\t%lf\n", *(edb_int*)(indexResults[i][0]), indexResults[i][1], *(double*)(indexResults[i][2]));
             }
+        }
+        else if (!strcmp(command, "delete") || !strcmp(command, "del"))
+        {
+            scanf("%lld", &tmpInputID);
+            retval = edbDelete(&db, &tmpInputID);
+            if (retval == KEY_NOT_FOUND)
+            {
+                printf("Not found!\n");
+            }
+            else
+            {
+                printf("Success!\n");
+            }
+        }
+        else if (!strcmp(command, "update"))
+        {
+            scanf("%lld %s %s", &tmpInputID, inColName, buf);
+            columnIndex = columnNameToColumnIndex(&db, inColName);
+            switch (db.dataTypes[columnIndex])
+            {
+            case EDB_TYPE_INT:
+                edb_int newInputID;
+                newInputID = atoll(buf);
+                retval = edbUpdate(&db, &tmpInputID, columnIndex, &newInputID);
+                break;
+            case EDB_TYPE_TEXT:
+                retval = edbUpdate(&db, &tmpInputID, columnIndex, buf);
+                break;
+            case EDB_TYPE_REAL:
+                tmpInputBalance = atof(buf);
+                retval = edbUpdate(&db, &tmpInputID, columnIndex, &tmpInputBalance);
+            default:
+                break;
+            }
+            if (retval == KEY_NOT_FOUND)
+            {
+                printf("Not found!\n");
+            }
+            
         }
         else if (!strcmp(command, "quit"))
         {

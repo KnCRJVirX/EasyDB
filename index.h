@@ -32,7 +32,7 @@ typedef struct IndexNode
 
 int IndexInsertINT(IndexINTNode** head, edb_int inKey, void* data);
 int IndexInsertTEXT(IndexTEXTNode** head, char* inKey, void* data);
-int IndexInsert(IndexNode** head, void* inKey, size_t keyLenth, void* data);
+// int IndexInsert(IndexNode** head, void* inKey, size_t keyLenth, void* data);
 size_t IndexFindINT(IndexINTNode** head, edb_int inKey, void** findResult, size_t len);
 size_t IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResult, size_t len);
 int IndexDelINT(IndexINTNode** head, edb_int inKey, void* data_ptr);

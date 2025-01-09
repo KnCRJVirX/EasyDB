@@ -26,6 +26,11 @@ int edbOpen(const char* filename, EasyDB* db);
 int edbClose(EasyDB *db);
 
 int edbInsert(EasyDB *db, void* row[]);
-int edbDelete(EasyDB *db, EDBRow* row);
-int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, void*** indexResult);
-size_t edbIndex(EasyDB* db, size_t colIndex, void* inKey, void*** indexResults, size_t maxResultNumber);
+int edbDelete(EasyDB *db, void* primaryKey);
+size_t edbWhere(EasyDB *db, size_t columnIndex, void* inKey, void*** indexResults, size_t maxResultNumber);
+int edbUpdate(EasyDB *db, void* primaryKey, size_t updateColumnIndex, void* newData);
+
+int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult);
+int edbNodeDelete(EasyDB *db, EDBRow* row);
+
+size_t columnNameToColumnIndex(EasyDB *db, char *columnName);

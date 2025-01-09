@@ -53,7 +53,7 @@ int main(int argc, char const *argv[])
     printf("\n");
 
     ptr = db.head->next;                            //删除第一项测试数据
-    edbDelete(&db, ptr);
+    edbNodeDelete(&db, ptr);
 
     printf("%s\t\t%s\t%s\n", db.columnNames[0], db.columnNames[1], db.columnNames[2]);
     for (ptr = db.head->next; ptr != db.tail; ptr = ptr->next)      //遍历打印测试数据

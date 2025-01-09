@@ -70,7 +70,7 @@ int edbOpen(const char* filename, EasyDB* db)
     int ver;                                                                //版本号检查 
     fread(&ver, 4, 1, dbfile);
 
-    fread(&db->lineCount, EDB_INT_SIZE, 1, dbfile);                         //读取行数
+    fread(&db->rowCount, EDB_INT_SIZE, 1, dbfile);                         //读取行数
     fread(&db->lineLen, EDB_INT_SIZE, 1, dbfile);                           //读取行长度
     fread(&db->columnCount, EDB_INT_SIZE, 1, dbfile);                         //读取每行数据个数
 
@@ -207,7 +207,7 @@ int edbInsert(EasyDB *db, void* row[])
     ptr = ptr->next;
     ptr->prev = pre;
     ptr->next = db->tail;
-    ptr->id = (db->lineCount == 0) ? 0 : ptr->prev->id + 1;
+    ptr->id = (db->rowCount == 0) ? 0 : ptr->prev->id + 1;
     db->tail->prev = ptr;
     db->tmpptr = ptr;
 
@@ -247,11 +247,11 @@ int edbInsert(EasyDB *db, void* row[])
         default:
             break;
     }
-    db->lineCount += 1;
+    db->rowCount += 1;
     return 0;
 }
 
-int edbDelete(EasyDB *db, EDBRow* row)
+int edbNodeDelete(EasyDB *db, EDBRow* row)
 {
     if (row == NULL || db == NULL) return NULL_PTR_ERROR;
 
@@ -285,10 +285,10 @@ int edbDelete(EasyDB *db, EDBRow* row)
     return 0;
 }
 
-int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, void*** indexResult)
+int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult)
 {
     int retval = 0;
-    void** findRes;
+    EDBRow* findRes;
     switch (db->dataTypes[db->primaryKey])
     {
     case EDB_TYPE_INT:
@@ -307,16 +307,19 @@ int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, void*** indexResult)
     return 0;
 }
 
-size_t edbIndex(EasyDB* db, size_t colIndex, void* inKey, void*** indexResults, size_t maxResultNumber)
+size_t edbWhere(EasyDB* db, size_t columnIndex, void* inKey, void*** indexResults, size_t maxResultNumber)
 {
-    int retval = 0;
-    switch (db->dataTypes[colIndex])
+    if (db == NULL || inKey == NULL) return NULL_PTR_ERROR;
+    if (columnIndex >= db->columnCount) return COLUMN_INDEX_OUT_OF_RANGE;
+    
+    size_t retval = 0;
+    switch (db->dataTypes[columnIndex])
     {
     case EDB_TYPE_INT:
-        retval = IndexFindINT((IndexINTNode**)&db->indexheads[colIndex], *(edb_int*)inKey, (void**)indexResults, maxResultNumber);
+        retval = IndexFindINT((IndexINTNode**)&db->indexheads[columnIndex], *(edb_int*)inKey, (void**)indexResults, maxResultNumber);
         break;
     case EDB_TYPE_TEXT:
-        retval = IndexFindTEXT((IndexTEXTNode**)&db->indexheads[colIndex], (char*)inKey, (void**)indexResults, maxResultNumber);
+        retval = IndexFindTEXT((IndexTEXTNode**)&db->indexheads[columnIndex], (char*)inKey, (void**)indexResults, maxResultNumber);
         break;
     default:
         return TYPE_CANNOT_INDEX;
@@ -330,12 +333,58 @@ size_t edbIndex(EasyDB* db, size_t colIndex, void* inKey, void*** indexResults, 
     return retval;
 }
 
+int edbDelete(EasyDB *db, void* primaryKey)
+{
+    if (db == NULL || primaryKey == NULL) return NULL_PTR_ERROR;
+    
+    EDBRow *findRes = NULL;
+    edbPrimaryKeyIndex(db, primaryKey, &findRes);
+
+    if (findRes == NULL) return KEY_NOT_FOUND;
+
+    edbNodeDelete(db, findRes);
+    db->rowCount -= 1;
+    return 0;
+}
+
+int edbUpdate(EasyDB *db, void* primaryKey, size_t updateColumnIndex, void* newData)
+{
+    if (db == NULL || primaryKey == NULL) return NULL_PTR_ERROR;
+    if (updateColumnIndex >= db->columnCount) return COLUMN_INDEX_OUT_OF_RANGE;
+
+    EDBRow *findRes = NULL;
+    edbPrimaryKeyIndex(db, primaryKey, &findRes);
+
+    if (findRes == NULL) return KEY_NOT_FOUND;
+
+    switch (db->dataTypes[updateColumnIndex])
+    {
+    case EDB_TYPE_INT:
+        IndexDelINT((IndexINTNode**)&db->indexheads[updateColumnIndex], *(edb_int*)(((void**)(findRes->data))[updateColumnIndex]), findRes);
+        IndexInsertINT((IndexINTNode**)&db->indexheads[updateColumnIndex], *(edb_int*)newData, findRes);
+        memcpy((void**)(findRes->data)[updateColumnIndex], newData, EDB_INT_SIZE);
+        break;
+    case EDB_TYPE_TEXT:
+        IndexDelTEXT((IndexTEXTNode**)&db->indexheads[updateColumnIndex], (char*)(((void**)(findRes->data))[updateColumnIndex]), findRes);
+        IndexInsertTEXT((IndexTEXTNode**)&db->indexheads[updateColumnIndex], (char*)newData, findRes);
+        memcpy((void**)(findRes->data)[updateColumnIndex], newData, db->dataLens[updateColumnIndex]);
+        break;
+    case EDB_TYPE_REAL:
+        memcpy((void**)(findRes->data)[updateColumnIndex], newData, EDB_REAL_SIZE);
+    case EDB_TYPE_BLOB:
+        memcpy((void**)(findRes->data)[updateColumnIndex], newData, db->dataLens[updateColumnIndex]);
+    default:
+        break;
+    }
+    return 0;
+}
+
 int edbClose(EasyDB *db)
 {
     char fileHead[db->dataFileOffset];
     FILE* dbfileReadHead = fopen64(db->dbfilename, "rb+");
     fread(fileHead, 1, db->dataFileOffset, dbfileReadHead);
-    *(size_t*)&fileHead[4 + 4] = db->lineCount;
+    *(size_t*)&fileHead[4 + 4] = db->rowCount;
 
     FILE* dbfile = fopen64(db->dbfilename, "wb+");
     fwrite(fileHead, 1, db->dataFileOffset, dbfile);
@@ -343,7 +392,7 @@ int edbClose(EasyDB *db)
     EDBRow* ptr = db->head;
     EDBRow* pre = db->head;
     ptr = ptr->next;
-    for (size_t i = 0; i < db->lineCount && ptr != db->tail; i++)
+    for (size_t i = 0; i < db->rowCount && ptr != db->tail; i++)
     {
         for (size_t j = 0; j < db->columnCount; j++)
         {
@@ -364,4 +413,17 @@ int edbClose(EasyDB *db)
     free(db->dataLens);
     fclose(dbfile);
     return 0;
+}
+
+
+size_t columnNameToColumnIndex(EasyDB *db, char *columnName)
+{
+    for (size_t i = 0; i < db->columnCount; i++)
+    {
+        if (!strcmp(db->columnNames[i], columnName))
+        {
+            return i;
+        }
+    }
+    return COLUMN_NOT_FOUND;
 }
