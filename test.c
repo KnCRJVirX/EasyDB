@@ -3,9 +3,9 @@
 int main(int argc, char const *argv[])
 {
     size_t dataTypes[] = {EDB_TYPE_INT, EDB_TYPE_TEXT, EDB_TYPE_REAL};
-    size_t dataLens[] = {0, 50, 0};
+    size_t dataSizes[] = {0, 50, 0};
     char* columnNames[] = {"ID", "Name", "Balance"};
-    edbCreate(".\\test.db", 3, 1, dataTypes, dataLens, columnNames);
+    edbCreate(".\\test.db", 3, 1, dataTypes, dataSizes, columnNames);
     EasyDB db;
 
 

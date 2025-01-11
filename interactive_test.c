@@ -4,16 +4,18 @@
 #include "src/uthash.h"
 #include "index.h"
 #include "easydb.h"
+#define COMMAND_SIZE 50
+#define BUF_SIZE 50
+#define NAME_SIZE 30
 
 int main(int argc, char const *argv[])
 {
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
     EasyDB db;
-    EDBRow *ptr;
     const char* dbfilename = ".\\interactive_test.db";
     size_t dataTypes[] = {EDB_TYPE_INT, EDB_TYPE_TEXT, EDB_TYPE_REAL};
-    size_t dataLenths[] = {0, 30, 0};
+    size_t dataLenths[] = {0, NAME_SIZE, 0};
     char* colNames[] = {"ID", "Name", "Balance"};
     int retval = edbOpen(dbfilename, &db);
     if (retval == FILE_OPEN_ERROR)
@@ -22,13 +24,12 @@ int main(int argc, char const *argv[])
         edbOpen(dbfilename, &db);
     }
     
-    char command[50];
+    char command[COMMAND_SIZE];
     char inColName[30];
-    char buf[50];
+    char buf[BUF_SIZE];
     edb_int tmpInputID;
     double tmpInputBalance;
-    void** indexResults[10];
-    size_t findCount;
+    void** findResults[10];
 
     edb_int newID;
     char newName[30];
@@ -53,39 +54,43 @@ int main(int argc, char const *argv[])
         else if (!strcmp(command, "show"))
         {
             printf("%s\t\t%s\t\t%s\n", db.columnNames[0], db.columnNames[1], db.columnNames[2]);
-            for (ptr = db.head->next; ptr != db.tail; ptr = ptr->next)      //遍历打印测试数据
+            for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))      //遍历打印测试数据
             {
-                printf("%d\t%-15s\t%lf\n", *(edb_int*)(ptr->data[0]), ptr->data[1], *(double*)(ptr->data[2]));
+                printf("%d\t%-15s\t%lf\n", *(edb_int*)(it[0]), it[1], *(double*)(it[2]));
             }
             printf("\n");
         }
-        else if (!strcmp(command, "index") || !strcmp(command, "select"))
+        else if (!strcmp(command, "select"))
         {
-            scanf("%s %s", inColName, buf);
+            scanf("%s", inColName);
+            getchar();
+            fgets(buf, BUF_SIZE, stdin);
+            if (strchr(buf, '\n')) *(strchr(buf, '\n')) = 0;
             columnIndex = columnNameToColumnIndex(&db, inColName);
+            size_t resultsCount;
             switch (db.dataTypes[columnIndex])
             {
             case EDB_TYPE_INT:
                 tmpInputID = atoll(buf);
-                findCount = edbWhere(&db, columnIndex, &tmpInputID, indexResults, 10);
+                retval = edbWhere(&db, columnIndex, &tmpInputID, findResults, 10, &resultsCount);
                 break;
             case EDB_TYPE_TEXT:
-                findCount = edbWhere(&db, columnIndex, buf, indexResults, 10);
+                retval = edbWhere(&db, columnIndex, buf, findResults, 10, &resultsCount);
                 break;
             default:
                 break;
             }
-            if (findCount == 0)
+            if (resultsCount == 0)
             {
                 printf("Not found!\n");
                 continue;
             }
-            for (size_t i = 0; i < findCount; i++)
+            for (size_t i = 0; i < resultsCount; i++)
             {
-                printf("%d\t%-15s\t%lf\n", *(edb_int*)(indexResults[i][0]), indexResults[i][1], *(double*)(indexResults[i][2]));
+                printf("%d\t%-15s\t%lf\n", *(edb_int*)(findResults[i][0]), findResults[i][1], *(double*)(findResults[i][2]));
             }
         }
-        else if (!strcmp(command, "delete") || !strcmp(command, "del"))
+        else if (!strcmp(command, "delete"))
         {
             scanf("%lld", &tmpInputID);
             retval = edbDelete(&db, &tmpInputID);
@@ -122,7 +127,26 @@ int main(int argc, char const *argv[])
             {
                 printf("Not found!\n");
             }
-            
+        }
+        else if (!strcmp(command, "search"))
+        {
+            char keyword[30];
+            size_t resultsCount;
+            getchar();
+            fgets(keyword, NAME_SIZE, stdin);
+            if (strchr(keyword, '\n')) *(strchr(keyword, '\n')) = 0;
+            retval = edbSearch(&db, 1, keyword, findResults, 10, &resultsCount);
+            if (resultsCount == 0)
+            {
+                printf("Not found!\n");
+            }
+            else
+            {
+                for (size_t i = 0; i < resultsCount; i++)
+                {
+                    printf("%d\t%-15s\t%lf\n", *(edb_int*)(findResults[i][0]), findResults[i][1], *(double*)(findResults[i][2]));
+                }
+            }
         }
         else if (!strcmp(command, "quit"))
         {

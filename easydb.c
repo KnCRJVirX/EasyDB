@@ -1,6 +1,6 @@
 #include "easydb.h"
 #include "index.h"
-int edbCreate(const char* filename, size_t columnCount, size_t primaryKeyIndex, size_t dataTypes[], size_t dataLens[], char* columnNames[])
+int edbCreate(const char* filename, size_t columnCount, size_t primaryKeyIndex, size_t dataTypes[], size_t dataSizes[], char* columnNames[])
 {
     if (filename == NULL) return NULL_PTR_ERROR;
     if (dataTypes[primaryKeyIndex] != EDB_TYPE_INT && dataTypes[primaryKeyIndex] != EDB_TYPE_TEXT) return PRIMARY_KEY_TYPE_CANNOT_INDEX;
@@ -17,34 +17,34 @@ int edbCreate(const char* filename, size_t columnCount, size_t primaryKeyIndex, 
     size_t emptyLineCount = 0;
     fwrite(&emptyLineCount, EDB_INT_SIZE, 1, dbfile);
 
-    size_t lineLen = 0;
+    size_t lineSize = 0;
     for (size_t i = 0; i < columnCount; i++)
     {
         switch (dataTypes[i])
         {
         case EDB_TYPE_INT:
-            lineLen += EDB_INT_SIZE;
-            dataLens[i] = EDB_INT_SIZE;
+            lineSize += EDB_INT_SIZE;
+            dataSizes[i] = EDB_INT_SIZE;
             break;
         case EDB_TYPE_REAL:
-            lineLen += EDB_REAL_SIZE;
-            dataLens[i] = EDB_REAL_SIZE;
+            lineSize += EDB_REAL_SIZE;
+            dataSizes[i] = EDB_REAL_SIZE;
             break;
         case EDB_TYPE_TEXT:
-            lineLen += dataLens[i];
+            lineSize += dataSizes[i];
             break;
         case EDB_TYPE_BLOB:
-            lineLen += dataLens[i];
+            lineSize += dataSizes[i];
             break;
         default:
             break;
         }
     }
-    fwrite(&lineLen, EDB_INT_SIZE, 1, dbfile);
+    fwrite(&lineSize, EDB_INT_SIZE, 1, dbfile);
 
     fwrite(&columnCount, EDB_INT_SIZE, 1, dbfile);
     fwrite(dataTypes, EDB_INT_SIZE, columnCount, dbfile);
-    fwrite(dataLens, EDB_INT_SIZE, columnCount, dbfile);
+    fwrite(dataSizes, EDB_INT_SIZE, columnCount, dbfile);
     for (size_t i = 0; i < columnCount; i++)
     {
         fwrite(columnNames[i], sizeof(char), strlen(columnNames[i]) + 1, dbfile); //+1是为了把结束符也写入文件
@@ -69,15 +69,15 @@ int edbOpen(const char* filename, EasyDB* db)
     int ver;                                                                //版本号检查 
     fread(&ver, 4, 1, dbfile);
 
-    fread(&db->rowCount, EDB_INT_SIZE, 1, dbfile);                         //读取行数
-    fread(&db->lineLen, EDB_INT_SIZE, 1, dbfile);                           //读取行长度
-    fread(&db->columnCount, EDB_INT_SIZE, 1, dbfile);                         //读取每行数据个数
+    fread(&db->rowCount, EDB_INT_SIZE, 1, dbfile);                          //读取行数
+    fread(&db->lineSize, EDB_INT_SIZE, 1, dbfile);                           //读取行长度
+    fread(&db->columnCount, EDB_INT_SIZE, 1, dbfile);                       //读取每行数据个数
 
-    db->dataTypes = (size_t*)malloc(db->columnCount * sizeof(size_t));         //读取一行中每个数据的类型
+    db->dataTypes = (size_t*)malloc(db->columnCount * sizeof(size_t));      //读取一行中每个数据的类型
     fread(db->dataTypes, EDB_INT_SIZE, db->columnCount, dbfile);
 
-    db->dataLens = (size_t*)malloc(db->columnCount * sizeof(size_t));         //读取一行中每个数据的长度
-    fread(db->dataLens, EDB_INT_SIZE, db->columnCount, dbfile);
+    db->dataSizes = (size_t*)malloc(db->columnCount * sizeof(size_t));       //读取一行中每个数据的长度
+    fread(db->dataSizes, EDB_INT_SIZE, db->columnCount, dbfile);
 
     char colNameBuf[1024];                                                  //读取列名
     size_t colNameLen;
@@ -90,14 +90,14 @@ int edbOpen(const char* filename, EasyDB* db)
         {
             c = fgetc(dbfile);
             colNameBuf[colNameLen++] = c;
-        } while (c != 0);
+        } while (c != 0 && c < 1024);
         db->columnNames[i] = (char*)malloc(colNameLen);
         strcpy(db->columnNames[i], colNameBuf);
     }
 
     fread(&db->primaryKey, EDB_INT_SIZE, 1, dbfile);                        //读取主键索引
 
-    db->dataOffset = (size_t*)malloc(db->columnCount * sizeof(size_t));       //记录文件头长度
+    db->dataOffset = (size_t*)malloc(db->columnCount * sizeof(size_t));     //记录文件头长度
     size_t offset = 0;
     for (size_t i = 0; i < db->columnCount; i++)
     {
@@ -111,10 +111,10 @@ int edbOpen(const char* filename, EasyDB* db)
             offset += EDB_REAL_SIZE;
             break;
         case EDB_TYPE_TEXT:
-            offset += db->dataLens[i];
+            offset += db->dataSizes[i];
             break;
         case EDB_TYPE_BLOB:
-            offset += db->dataLens[i];
+            offset += db->dataSizes[i];
             break;
         default:
             break;
@@ -123,7 +123,7 @@ int edbOpen(const char* filename, EasyDB* db)
 
     db->dataFileOffset = ftello64(dbfile);                                  //记录数据开始的位置
 
-    db->indexheads = calloc(db->columnCount, sizeof(void*));                 //初始化索引表头指针
+    db->indexheads = calloc(db->columnCount, sizeof(void*));                //初始化索引表头指针
 
     db->head = (EDBRow*)malloc(sizeof(EDBRow));
     db->head->prev = NULL;
@@ -131,9 +131,9 @@ int edbOpen(const char* filename, EasyDB* db)
     db->tail->next = NULL;
     EDBRow* ptr = db->head;
     EDBRow* pre = db->head;
-    char rbuf[db->lineLen];
+    char rbuf[db->lineSize];
     size_t cur_id = 0;
-    while (fread(rbuf, 1, db->lineLen, dbfile))
+    while (fread(rbuf, 1, db->lineSize, dbfile))
     {
         ptr->next = (EDBRow*)malloc(sizeof(EDBRow));
         ptr = ptr->next;
@@ -142,8 +142,8 @@ int edbOpen(const char* filename, EasyDB* db)
         ptr->data = (void**)malloc(db->columnCount * sizeof(void*));
         for (size_t i = 0; i < db->columnCount; i++)                          //读取一行中多个数据
         {
-            ptr->data[i] = (void*)malloc(db->dataLens[i]);
-            memcpy(ptr->data[i], rbuf + db->dataOffset[i], db->dataLens[i]);
+            ptr->data[i] = (void*)malloc(db->dataSizes[i]);
+            memcpy(ptr->data[i], rbuf + db->dataOffset[i], db->dataSizes[i]);
             if (i != db->primaryKey)                                          //非主键的情况下，将数据插入索引
             {
                 switch (db->dataTypes[i])
@@ -182,6 +182,58 @@ int edbOpen(const char* filename, EasyDB* db)
     return 0;
 }
 
+int edbClose(EasyDB *db)
+{
+    char fileHead[db->dataFileOffset];
+    FILE* dbfileReadHead = fopen64(db->dbfilename, "rb+");
+    fread(fileHead, 1, db->dataFileOffset, dbfileReadHead);
+    *(size_t*)&fileHead[4 + 4] = db->rowCount;
+
+    FILE* dbfile = fopen64(db->dbfilename, "wb+");
+    fwrite(fileHead, 1, db->dataFileOffset, dbfile);
+    fsetpos64(dbfile, &db->dataFileOffset);
+    EDBRow* ptr = db->head->next;
+    EDBRow* pre = db->head->next;
+    free(db->head);
+    for (size_t i = 0; i < db->rowCount && ptr != db->tail; i++)
+    {
+        for (size_t j = 0; j < db->columnCount; j++)
+        {
+            fwrite(ptr->data[j], 1, db->dataSizes[j], dbfile);
+            free(ptr->data[j]);
+        }
+        free(ptr->data);
+        ptr = ptr->next;
+        free(pre);
+        pre = ptr;
+    }
+    free(ptr);
+
+    for (size_t i = 0; i < db->columnCount; i++)
+    {
+        switch (db->dataTypes[i])
+        {
+        case EDB_TYPE_INT:
+            IndexClearINT((IndexINTNode**)&db->indexheads[i]);
+            break;
+        case EDB_TYPE_TEXT:
+            IndexClearTEXT((IndexTEXTNode**)&db->indexheads[i]);
+            break;
+        default:
+            break;
+        }
+    }
+    
+    for (size_t i = 0; i < db->columnCount; i++) free(db->columnNames[i]);
+    free(db->columnNames);
+    free(db->dataTypes);
+    free(db->dataOffset);
+    free(db->dataSizes);
+    free(db->indexheads);
+    fclose(dbfile);
+    return 0;
+}
+
 int edbInsert(EasyDB *db, void* row[])
 {
     if (db == NULL || row == NULL) return NULL_PTR_ERROR;
@@ -213,13 +265,13 @@ int edbInsert(EasyDB *db, void* row[])
     ptr->data = (void**)malloc(db->columnCount * sizeof(void*));
     for (size_t i = 0; i < db->columnCount; i++)
     {
-        ptr->data[i] = (void*)calloc(db->dataLens[i], 1);
+        ptr->data[i] = (void*)calloc(db->dataSizes[i], 1);
         if (db->dataTypes[i] >= EDB_TYPE_TEXT)
         {
-            strncpy(ptr->data[i], row[i], db->dataLens[i]);
-            ((char*)ptr->data[i])[db->dataLens[i] - 1] = 0;
+            strncpy(ptr->data[i], row[i], db->dataSizes[i]);
+            ((char*)ptr->data[i])[db->dataSizes[i] - 1] = 0;
         }
-        else memcpy(ptr->data[i], row[i], db->dataLens[i]);
+        else memcpy(ptr->data[i], row[i], db->dataSizes[i]);
         if (i != db->primaryKey)                                          //非主键的情况下，将数据插入索引
         {
             switch (db->dataTypes[i])
@@ -306,7 +358,7 @@ int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult)
     return 0;
 }
 
-size_t edbWhere(EasyDB* db, size_t columnIndex, void* inKey, void*** indexResults, size_t maxResultNumber)
+int edbWhere(EasyDB *db, size_t columnIndex, void* inKey, void*** findResults, size_t maxResultNumber, size_t *resultsCount)
 {
     if (db == NULL || inKey == NULL) return NULL_PTR_ERROR;
     if (columnIndex >= db->columnCount) return COLUMN_INDEX_OUT_OF_RANGE;
@@ -315,10 +367,10 @@ size_t edbWhere(EasyDB* db, size_t columnIndex, void* inKey, void*** indexResult
     switch (db->dataTypes[columnIndex])
     {
     case EDB_TYPE_INT:
-        retval = IndexFindINT((IndexINTNode**)&db->indexheads[columnIndex], *(edb_int*)inKey, (void**)indexResults, maxResultNumber);
+        retval = IndexFindINT((IndexINTNode**)&db->indexheads[columnIndex], *(edb_int*)inKey, (void**)findResults, maxResultNumber);
         break;
     case EDB_TYPE_TEXT:
-        retval = IndexFindTEXT((IndexTEXTNode**)&db->indexheads[columnIndex], (char*)inKey, (void**)indexResults, maxResultNumber);
+        retval = IndexFindTEXT((IndexTEXTNode**)&db->indexheads[columnIndex], (char*)inKey, (void**)findResults, maxResultNumber);
         break;
     default:
         return TYPE_CANNOT_INDEX;
@@ -326,10 +378,11 @@ size_t edbWhere(EasyDB* db, size_t columnIndex, void* inKey, void*** indexResult
     }
     for (size_t i = 0; i < retval; i++)
     {
-        indexResults[i] = ((EDBRow*)(indexResults[i]))->data;
+        findResults[i] = ((EDBRow*)(findResults[i]))->data;
     }
+    *resultsCount = retval;
     
-    return retval;
+    return 0;
 }
 
 int edbDelete(EasyDB *db, void* primaryKey)
@@ -366,56 +419,19 @@ int edbUpdate(EasyDB *db, void* primaryKey, size_t updateColumnIndex, void* newD
     case EDB_TYPE_TEXT:
         IndexDelTEXT((IndexTEXTNode**)&db->indexheads[updateColumnIndex], (char*)(((void**)(findRes->data))[updateColumnIndex]), findRes);
         IndexInsertTEXT((IndexTEXTNode**)&db->indexheads[updateColumnIndex], (char*)newData, findRes);
-        memcpy((void**)(findRes->data)[updateColumnIndex], newData, db->dataLens[updateColumnIndex]);
+        memcpy((void**)(findRes->data)[updateColumnIndex], newData, db->dataSizes[updateColumnIndex]);
         break;
     case EDB_TYPE_REAL:
         memcpy((void**)(findRes->data)[updateColumnIndex], newData, EDB_REAL_SIZE);
     case EDB_TYPE_BLOB:
-        memcpy((void**)(findRes->data)[updateColumnIndex], newData, db->dataLens[updateColumnIndex]);
+        memcpy((void**)(findRes->data)[updateColumnIndex], newData, db->dataSizes[updateColumnIndex]);
     default:
         break;
     }
     return 0;
 }
 
-int edbClose(EasyDB *db)
-{
-    char fileHead[db->dataFileOffset];
-    FILE* dbfileReadHead = fopen64(db->dbfilename, "rb+");
-    fread(fileHead, 1, db->dataFileOffset, dbfileReadHead);
-    *(size_t*)&fileHead[4 + 4] = db->rowCount;
-
-    FILE* dbfile = fopen64(db->dbfilename, "wb+");
-    fwrite(fileHead, 1, db->dataFileOffset, dbfile);
-    fsetpos64(dbfile, &db->dataFileOffset);
-    EDBRow* ptr = db->head;
-    EDBRow* pre = db->head;
-    ptr = ptr->next;
-    for (size_t i = 0; i < db->rowCount && ptr != db->tail; i++)
-    {
-        for (size_t j = 0; j < db->columnCount; j++)
-        {
-            fwrite(ptr->data[j], 1, db->dataLens[j], dbfile);
-            free(ptr->data[j]);
-        }
-        free(ptr->data);
-        ptr = ptr->next;
-        free(pre);
-        pre = ptr;
-    }
-    free(ptr);
-
-    for (size_t i = 0; i < db->columnCount; i++) free(db->columnNames[i]);
-    free(db->columnNames);
-    free(db->dataTypes);
-    free(db->dataOffset);
-    free(db->dataLens);
-    fclose(dbfile);
-    return 0;
-}
-
-
-size_t columnNameToColumnIndex(EasyDB *db, char *columnName)
+long long columnNameToColumnIndex(EasyDB *db, char *columnName)
 {
     for (size_t i = 0; i < db->columnCount; i++)
     {
@@ -425,4 +441,38 @@ size_t columnNameToColumnIndex(EasyDB *db, char *columnName)
         }
     }
     return COLUMN_NOT_FOUND;
+}
+
+void** edbIterBegin(EasyDB *db)
+{
+    if (db->rowCount == 0) return NULL;
+
+    EDBRow *ptr = db->head->next;
+    db->tmpptr = ptr;
+    return ptr->data;
+}
+
+void** edbIterNext(EasyDB *db)
+{
+    if (db->tmpptr->next == db->tail) return NULL;
+    
+    db->tmpptr = db->tmpptr->next;
+    return db->tmpptr->data;
+}
+
+int edbSearch(EasyDB *db, size_t columnIndex, char* keyWord, void*** findResults, size_t maxResultNumber, size_t *resultsCount)
+{
+    if (db == NULL || keyWord == NULL || findResults == NULL) return NULL_PTR_ERROR;
+    if (db->dataTypes[columnIndex] != EDB_TYPE_TEXT) return NOT_TEXT_COLUMN;
+    
+    size_t curResultsCount = 0;
+    for (void** it = edbIterBegin(db); it != NULL; it = edbIterNext(db))
+    {
+        if (strstr((char*)it[columnIndex], keyWord))
+        {
+            findResults[curResultsCount++] = it;
+        }
+    }
+    *resultsCount = curResultsCount;
+    return 0;
 }

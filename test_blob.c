@@ -12,9 +12,9 @@ typedef struct Person
 int main(int argc, char const *argv[])
 {
     size_t dataTypes[] = {EDB_TYPE_BLOB};
-    size_t dataLens[] = {sizeof(Person)};
+    size_t dataSizes[] = {sizeof(Person)};
     char *colNames[] = {"AddressBook"};
-    edbCreate(".\\test_blob.db", 1, dataTypes, dataLens, 0, colNames);
+    edbCreate(".\\test_blob.db", 1, dataTypes, dataSizes, 0, colNames);
     
     EasyDB db;
     edbOpen(".\\test_blob.db", &db);

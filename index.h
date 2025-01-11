@@ -37,5 +37,7 @@ size_t IndexFindINT(IndexINTNode** head, edb_int inKey, void** findResult, size_
 size_t IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResult, size_t len);
 int IndexDelINT(IndexINTNode** head, edb_int inKey, void* data_ptr);
 int IndexDelTEXT(IndexTEXTNode** head, char* inKey, void* data_ptr);
+int IndexClearINT(IndexINTNode** head);
+int IndexClearTEXT(IndexTEXTNode** head);
 
 #endif

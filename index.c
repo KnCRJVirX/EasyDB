@@ -179,3 +179,37 @@ int IndexDelTEXT(IndexTEXTNode** head, char* inKey, void* data_ptr)
     }
     return 0;
 }
+
+int IndexClearINT(IndexINTNode** head)
+{
+    IndexINTNode *ptr1, *ptr2;
+    IndexINTNode *pre, *ptr;
+    HASH_ITER(hh, *head, ptr1, ptr2){
+        HASH_DEL(*head, ptr1);
+        ptr = pre = ptr1;
+        while (ptr != NULL)
+        {
+            ptr = ptr->next;
+            free(pre);
+            pre = ptr;
+        }
+    }
+    return 0;
+}
+
+int IndexClearTEXT(IndexTEXTNode** head)
+{
+    IndexTEXTNode *ptr1, *ptr2;
+    IndexTEXTNode *pre, *ptr;
+    HASH_ITER(hh, *head, ptr1, ptr2){
+        HASH_DEL(*head, ptr1);
+        ptr = pre = ptr1;
+        while (ptr != NULL)
+        {
+            ptr = ptr->next;
+            free(pre);
+            pre = ptr;
+        }
+    }
+    return 0;
+}
