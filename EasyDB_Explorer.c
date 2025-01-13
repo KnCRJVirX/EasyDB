@@ -32,7 +32,14 @@ int main(int argc, char const *argv[])
         {
             for (size_t i = 0; i < db.columnCount - 1; i++)
             {
-                printf("%s | ", db.columnNames[i]);
+                if (i == db.primaryKey)
+                {
+                    printf("%s <Primary key> | ", db.columnNames[i]);
+                }
+                else
+                {
+                    printf("%s | ", db.columnNames[i]);
+                }
             }
             printf("%s\n", db.columnNames[db.columnCount - 1]);
             for (void** it = edbIterBegin(&db); it != NULL ; it = edbIterNext(&db))

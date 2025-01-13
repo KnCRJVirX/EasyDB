@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <windows.h>
 #include "easydb.h"
-#include "edbdef.h"
 
 int main(int argc, char const *argv[])
 {

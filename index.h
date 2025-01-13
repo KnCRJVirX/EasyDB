@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "edbdef.h"
+#include "easydb.h"
 #include "src/uthash.h"
 
 #ifndef INDEX

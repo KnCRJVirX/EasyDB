@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
-#include "src/uthash.h"
-#include "index.h"
 #include "easydb.h"
 #define COMMAND_SIZE 50
 #define BUF_SIZE 50
@@ -30,6 +28,7 @@ int main(int argc, char const *argv[])
     edb_int tmpInputID;
     double tmpInputBalance;
     void** findResults[10];
+    size_t resultsCount = 0;
 
     edb_int newID;
     char newName[30];
@@ -131,7 +130,6 @@ int main(int argc, char const *argv[])
         else if (!strcmp(command, "search"))
         {
             char keyword[30];
-            size_t resultsCount;
             getchar();
             fgets(keyword, NAME_SIZE, stdin);
             if (strchr(keyword, '\n')) *(strchr(keyword, '\n')) = 0;
@@ -146,6 +144,23 @@ int main(int argc, char const *argv[])
                 {
                     printf("%d\t%-15s\t%lf\n", Int(findResults[i][0]), findResults[i][1], Real(findResults[i][2]));
                 }
+            }
+        }
+        else if (!strcmp(command, "deletethem"))
+        {
+            retval = edbDeleteByArray(&db, findResults, resultsCount);
+            if (retval == SUCCESS)
+            {
+                printf("OK!\n");
+            }
+        }
+        else if (!strcmp(command, "deletekw"))
+        {
+            scanf("%s", newName);
+            retval = edbDeleteByKeyword(&db, 1, newName, 100);
+            if (retval == SUCCESS)
+            {
+                printf("OK!\n");
             }
         }
         else if (!strcmp(command, "save"))

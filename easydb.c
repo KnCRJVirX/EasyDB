@@ -510,6 +510,32 @@ int edbSearch(EasyDB *db, size_t columnIndex, char* keyWord, void*** findResults
     return SUCCESS;
 }
 
+int edbDeleteByArray(EasyDB *db, void** deleteRows[], size_t arraySize)
+{
+    if (db == NULL || deleteRows == NULL) return NULL_PTR_ERROR;
+    
+    int retvalRecv = 0;
+    int retval = SUCCESS;
+    for (size_t i = 0; i < arraySize; i++)
+    {
+        retvalRecv = edbDelete(db, deleteRows[i][db->primaryKey]);
+        if (retvalRecv == KEY_NOT_FOUND) retval = KEY_NOT_FOUND;
+    }
+    return retval;
+}
+
+int edbDeleteByKeyword(EasyDB *db, size_t columnIndex, char *keyword, size_t maxDeleteCount)
+{
+    if (db == NULL || keyword == NULL) return NULL_PTR_ERROR;
+
+    void** searchResults[maxDeleteCount];
+    size_t resultsCount = 0;
+    int retval = edbSearch(db, columnIndex, keyword, searchResults, maxDeleteCount, &resultsCount);
+
+    edbDeleteByArray(db, searchResults, resultsCount);
+    
+    return SUCCESS;
+}
 
 char* uuid(char *UUID) 
 {
