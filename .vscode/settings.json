@@ -6,6 +6,7 @@
         "stdlib.h": "c",
         "stdbool.h": "c",
         "stdint.h": "c",
-        "time.h": "c"
+        "time.h": "c",
+        "pthread_time.h": "c"
     }
 }

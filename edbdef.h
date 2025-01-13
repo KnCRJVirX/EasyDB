@@ -31,6 +31,7 @@ typedef double edb_real;
 #define COLUMN_NOT_FOUND -9                 //找不到列名对应的列
 #define EMPTY_TABLE -10                     //该表为空
 #define NOT_TEXT_COLUMN -11                 //该列非文本类型（仅支持对文本类型的列进行搜索）
+#define PASSWORD_WRONG -12                  //密码错误（Easy User Management）
 
 typedef struct ListNode
 {

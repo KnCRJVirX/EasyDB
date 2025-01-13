@@ -14,10 +14,10 @@ int main(int argc, char const *argv[])
     size_t dataTypes[] = {EDB_TYPE_BLOB};
     size_t dataSizes[] = {sizeof(Person)};
     char *colNames[] = {"AddressBook"};
-    edbCreate(".\\test_blob.db", 1, dataTypes, dataSizes, 0, colNames);
+    edbCreate("test01_blob.db", 1, dataTypes, dataSizes, 0, colNames);
     
     EasyDB db;
-    edbOpen(".\\test_blob.db", &db);
+    edbOpen("test01_blob.db", &db);
 
     Person man1 = {"Alice", "alice@gmail.com", "A test data.", 18};
     Person man2 = {"Bob", "13888888888", "A test data, too.", 20};

@@ -13,7 +13,7 @@ int main(int argc, char const *argv[])
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
     EasyDB db;
-    const char* dbfilename = ".\\interactive_test.db";
+    const char* dbfilename = "test00_interactive_test.db";
     size_t dataTypes[] = {EDB_TYPE_INT, EDB_TYPE_TEXT, EDB_TYPE_REAL};
     size_t dataLenths[] = {0, NAME_SIZE, 0};
     char* colNames[] = {"ID", "Name", "Balance"};
@@ -56,7 +56,7 @@ int main(int argc, char const *argv[])
             printf("%s\t\t%s\t\t%s\n", db.columnNames[0], db.columnNames[1], db.columnNames[2]);
             for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))      //遍历打印测试数据
             {
-                printf("%d\t%-15s\t%lf\n", *(edb_int*)(it[0]), it[1], *(double*)(it[2]));
+                printf("%d\t%-15s\t%lf\n", Int(it[0]), it[1], Real(it[2]));
             }
             printf("\n");
         }
@@ -87,7 +87,7 @@ int main(int argc, char const *argv[])
             }
             for (size_t i = 0; i < resultsCount; i++)
             {
-                printf("%d\t%-15s\t%lf\n", *(edb_int*)(findResults[i][0]), findResults[i][1], *(double*)(findResults[i][2]));
+                printf("%d\t%-15s\t%lf\n", Int(findResults[i][0]), findResults[i][1], Real(findResults[i][2]));
             }
         }
         else if (!strcmp(command, "delete"))
@@ -144,8 +144,16 @@ int main(int argc, char const *argv[])
             {
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    printf("%d\t%-15s\t%lf\n", *(edb_int*)(findResults[i][0]), findResults[i][1], *(double*)(findResults[i][2]));
+                    printf("%d\t%-15s\t%lf\n", Int(findResults[i][0]), findResults[i][1], Real(findResults[i][2]));
                 }
+            }
+        }
+        else if (!strcmp(command, "save"))
+        {
+            retval = edbSave(&db);
+            if (retval == SUCCESS)
+            {
+                printf("OK!\n");
             }
         }
         else if (!strcmp(command, "quit"))

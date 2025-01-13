@@ -12,7 +12,7 @@ int main(int argc, char const *argv[])
 
     EasyDB db;
     int retval;
-    char *dbfilename = ".//AddressBook.db";
+    char *dbfilename = "Example1_AddressBook.db";
     char* colNames[] = {"Name", "Contact", "Remarks"};
     size_t dataTypes[] = {EDB_TYPE_TEXT, EDB_TYPE_TEXT, EDB_TYPE_TEXT};
     size_t dataSizes[] = {NAME_SIZE, CONTACT_SIZE, REMARKS_SIZE};
