@@ -15,7 +15,7 @@ int edbCreate(const char* filename, size_t columnCount, char* primaryKeyColumnNa
     if (primaryKeyIndex == -1) return PRIMARY_KEY_NOT_IN_LIST;
     if (dataTypes[primaryKeyIndex] != EDB_TYPE_INT && dataTypes[primaryKeyIndex] != EDB_TYPE_TEXT) return PRIMARY_KEY_TYPE_CANNOT_INDEX;
     
-    FILE* dbfile = fopen64(filename, "wb+");
+    FILE* dbfile = fopen(filename, "wb+");
     if (dbfile == NULL) return FILE_OPEN_ERROR;
 
     int magicNum = EDB_MAGIC_NUMBER;
@@ -69,7 +69,7 @@ int edbOpen(const char* filename, EasyDB* db)
     if (filename == NULL || db == NULL) return NULL_PTR_ERROR;
     
     strcpy(db->dbfilename, filename);
-    FILE* dbfile = fopen64(db->dbfilename, "rb+");
+    FILE* dbfile = fopen(db->dbfilename, "rb+");
     if (dbfile == NULL) return FILE_OPEN_ERROR;
 
     int readMagicNum;                                                       //魔数检查
@@ -131,7 +131,7 @@ int edbOpen(const char* filename, EasyDB* db)
         }
     }
 
-    db->dataFileOffset = ftello64(dbfile);                                  //记录数据开始的位置
+    fgetpos(dbfile, &db->dataFileOffset);                                   //记录数据开始的位置
 
     db->indexheads = calloc(db->columnCount, sizeof(void*));                //初始化索引表头指针
 
@@ -154,7 +154,7 @@ int edbOpen(const char* filename, EasyDB* db)
         {
             ptr->data[i] = (void*)malloc(db->dataSizes[i]);
             memcpy(ptr->data[i], rbuf + db->dataOffset[i], db->dataSizes[i]);
-            if (i != db->primaryKeyIndex)                                          //非主键的情况下，将数据插入索引
+            if (i != db->primaryKeyIndex)                                     //非主键的情况下，将数据插入索引
             {
                 switch (db->dataTypes[i])
                 {
@@ -197,14 +197,14 @@ int edbClose(EasyDB *db)
     if (db == NULL) return NULL_PTR_ERROR;
     
     char fileHead[db->dataFileOffset];
-    FILE* dbfileReadHead = fopen64(db->dbfilename, "rb+");
+    FILE* dbfileReadHead = fopen(db->dbfilename, "rb+");
     fread(fileHead, 1, db->dataFileOffset, dbfileReadHead);
     *(size_t*)&fileHead[4 + 4] = db->rowCount;
     fclose(dbfileReadHead);
 
-    FILE* dbfile = fopen64(db->dbfilename, "wb+");
+    FILE* dbfile = fopen(db->dbfilename, "wb+");
     fwrite(fileHead, 1, db->dataFileOffset, dbfile);
-    fsetpos64(dbfile, &db->dataFileOffset);
+    fsetpos(dbfile, &db->dataFileOffset);
     EDBRow* ptr = db->head->next;
     EDBRow* pre = db->head->next;
     free(db->head);
@@ -252,14 +252,14 @@ int edbSave(EasyDB *db)
     if (db == NULL) return NULL_PTR_ERROR;
     
     char fileHead[db->dataFileOffset];
-    FILE* dbfileReadHead = fopen64(db->dbfilename, "rb+");
+    FILE* dbfileReadHead = fopen(db->dbfilename, "rb+");
     fread(fileHead, 1, db->dataFileOffset, dbfileReadHead);
     *(size_t*)&fileHead[4 + 4] = db->rowCount;
     fclose(dbfileReadHead);
 
-    FILE* dbfile = fopen64(db->dbfilename, "wb+");
+    FILE* dbfile = fopen(db->dbfilename, "wb+");
     fwrite(fileHead, 1, db->dataFileOffset, dbfile);
-    fsetpos64(dbfile, &db->dataFileOffset);
+    fsetpos(dbfile, &db->dataFileOffset);
     EDBRow* ptr = db->head->next;
     for (size_t i = 0; i < db->rowCount && ptr != db->tail; i++)
     {
@@ -490,7 +490,7 @@ long long columnNameToColumnIndex(EasyDB *db, char *columnName)
 
 void** edbIterBegin(EasyDB *db)
 {
-    if (db->rowCount == 0) return NULL;
+    if (db->rowCount == 0 || db->head == NULL || db->head == db->tail) return NULL;
 
     EDBRow *ptr = db->head->next;
     db->tmpptr = ptr;

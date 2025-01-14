@@ -63,7 +63,7 @@ typedef struct EasyDatabase
     size_t *dataTypes;              //每个数据的类型，>=9即为TEXT类型，数值即为TEXT+长度
     size_t *dataSizes;              //每个数据的长度
     char** columnNames;             //列名
-    long long dataFileOffset;       //数据在文件中开始的位置
+    fpos_t dataFileOffset;          //数据在文件中开始的位置
     void** indexheads;              //索引表头指针存储
 }EasyDatabase;
 typedef EasyDatabase EasyDB;
