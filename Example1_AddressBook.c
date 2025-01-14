@@ -26,7 +26,7 @@ int main(int argc, char const *argv[])
     retval = edbOpen(dbfilename, &db);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(dbfilename, 3, 0, dataTypes, dataSizes, colNames);
+        edbCreate(dbfilename, 3, "Name", dataTypes, dataSizes, colNames);
         edbOpen(dbfilename, &db);
     }
 
@@ -92,7 +92,7 @@ int main(int argc, char const *argv[])
             printf("Name: ");
             fgets(newName, NAME_SIZE, stdin);
             if (strchr(newName, '\n')) *(strchr(newName, '\n')) = 0;
-            retval = edbWhere(&db, 0, newName, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
+            retval = edbWhere(&db, "Name", newName, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
             if (resultsCount == 0)
             {
                 printf("Not found!\n");
@@ -111,7 +111,7 @@ int main(int argc, char const *argv[])
             printf("Contact: ");
             fgets(newContact, CONTACT_SIZE, stdin);
             if (strchr(newContact, '\n')) *(strchr(newContact, '\n')) = 0;
-            retval = edbWhere(&db, 1, newContact, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
+            retval = edbWhere(&db, "Contact", newContact, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
             if (resultsCount == 0)
             {
                 printf("Not found!\n");
@@ -130,7 +130,7 @@ int main(int argc, char const *argv[])
             printf("Name (You want to edit) : ");
             fgets(buf, NAME_SIZE, stdin);
             if (strchr(buf, '\n')) *(strchr(buf, '\n')) = 0;
-            retval = edbWhere(&db, 0, buf, searchResults, 1, &resultsCount);
+            retval = edbWhere(&db, "Name", buf, searchResults, 1, &resultsCount);
             if (resultsCount == 0)
             {
                 printf("Not found!\n");
@@ -140,33 +140,35 @@ int main(int argc, char const *argv[])
             {
                 printf("%s | %s | %s\n", searchResults[0][0], searchResults[0][1], searchResults[0][2]);
             }
-            
+
             printf("New Name (Input '/' to keep): ");
             fgets(newName, NAME_SIZE, stdin);
             if (strchr(newName, '\n')) *(strchr(newName, '\n')) = 0;
+
             printf("New Contact (Input '/' to keep): ");
             fgets(newContact, CONTACT_SIZE, stdin);
             if (strchr(newContact, '\n')) *(strchr(newContact, '\n')) = 0;
+
             printf("New Remarks (Input '/' to keep, input '/clear' to set empty) : ");
             fgets(newRemarks, REMARKS_SIZE, stdin);
             if (strchr(newRemarks, '\n')) *(strchr(newRemarks, '\n')) = 0;
-            if (newRemarks[0] == '/') newRemarks[0] = 0;
+
             if (strcmp(newName, "/"))
             {
-                edbUpdate(&db, buf, 0, newName);
+                edbUpdate(&db, buf, "Name", newName);
             }
             if (strcmp(newContact, "/"))
             {
-                edbUpdate(&db, buf, 1, newContact);
+                edbUpdate(&db, buf, "Contact", newContact);
             }
             if (!strcmp(newRemarks, "/clear"))
             {
                 newRemarks[0] = 0;
-                edbUpdate(&db, buf, 2, newRemarks);
+                edbUpdate(&db, buf, "Remarks", newRemarks);
             }
             else if (strcmp(newRemarks, "/"))
             {
-                edbUpdate(&db, buf, 2, newRemarks);
+                edbUpdate(&db, buf, "Remarks", newRemarks);
             }
         }    
         else if (!strcmp(command, "search") || !strcmp(command, "s"))
@@ -174,7 +176,7 @@ int main(int argc, char const *argv[])
             printf("Name: ");
             fgets(buf, NAME_SIZE, stdin);
             if (strchr(buf, '\n')) *(strchr(buf, '\n')) = 0;
-            retval = edbSearch(&db, 0, buf, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
+            retval = edbSearch(&db, "Name", buf, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
             if (resultsCount == 0)
             {
                 printf("Not found!\n");

@@ -18,7 +18,7 @@ int main(int argc, char const *argv[])
     int retval = edbOpen(dbfilename, &db);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(dbfilename, 3, 0, dataTypes, dataLenths, colNames);
+        edbCreate(dbfilename, 3, "ID", dataTypes, dataLenths, colNames);
         edbOpen(dbfilename, &db);
     }
     
@@ -71,10 +71,10 @@ int main(int argc, char const *argv[])
             {
             case EDB_TYPE_INT:
                 tmpInputID = atoll(buf);
-                retval = edbWhere(&db, columnIndex, &tmpInputID, findResults, 10, &resultsCount);
+                retval = edbWhere(&db, "ID", &tmpInputID, findResults, 10, &resultsCount);
                 break;
             case EDB_TYPE_TEXT:
-                retval = edbWhere(&db, columnIndex, buf, findResults, 10, &resultsCount);
+                retval = edbWhere(&db, "Name", buf, findResults, 10, &resultsCount);
                 break;
             default:
                 break;
@@ -111,14 +111,14 @@ int main(int argc, char const *argv[])
             case EDB_TYPE_INT:
                 edb_int newInputID;
                 newInputID = atoll(buf);
-                retval = edbUpdate(&db, &tmpInputID, columnIndex, &newInputID);
+                retval = edbUpdate(&db, &tmpInputID, "ID", &newInputID);
                 break;
             case EDB_TYPE_TEXT:
-                retval = edbUpdate(&db, &tmpInputID, columnIndex, buf);
+                retval = edbUpdate(&db, &tmpInputID, "Name", buf);
                 break;
             case EDB_TYPE_REAL:
                 tmpInputBalance = atof(buf);
-                retval = edbUpdate(&db, &tmpInputID, columnIndex, &tmpInputBalance);
+                retval = edbUpdate(&db, &tmpInputID, "Balance", &tmpInputBalance);
             default:
                 break;
             }
@@ -133,7 +133,7 @@ int main(int argc, char const *argv[])
             getchar();
             fgets(keyword, NAME_SIZE, stdin);
             if (strchr(keyword, '\n')) *(strchr(keyword, '\n')) = 0;
-            retval = edbSearch(&db, 1, keyword, findResults, 10, &resultsCount);
+            retval = edbSearch(&db, "Name", keyword, findResults, 10, &resultsCount);
             if (resultsCount == 0)
             {
                 printf("Not found!\n");
@@ -157,7 +157,7 @@ int main(int argc, char const *argv[])
         else if (!strcmp(command, "deletekw"))
         {
             scanf("%s", newName);
-            retval = edbDeleteByKeyword(&db, 1, newName, 100);
+            retval = edbDeleteByKeyword(&db, "Name", newName, 100);
             if (retval == SUCCESS)
             {
                 printf("OK!\n");

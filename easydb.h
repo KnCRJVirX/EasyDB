@@ -30,7 +30,7 @@ typedef double edb_real;
 #define MAGIC_NUMBER_ERROR -2               //魔数错误（非EasyDB数据库文件）
 #define NULL_PTR_ERROR -3                   //空指针错误
 #define PRIMARY_KEY_NOT_UNIQUE -4           //主键重复
-#define PRIMARY_KEY_TYPE_CANNOT_INDEX -5    //仅支持整数和文本的索引
+#define PRIMARY_KEY_TYPE_CANNOT_INDEX -5    //仅支持整数和文本的索引，主键必须是整数或文本类型
 #define TYPE_CANNOT_INDEX -6                //仅支持整数和文本的索引
 #define KEY_NOT_FOUND -7                    //未找到匹配的行
 #define COLUMN_INDEX_OUT_OF_RANGE -8        //传入的列索引超出原来的列数
@@ -38,6 +38,7 @@ typedef double edb_real;
 #define EMPTY_TABLE -10                     //该表为空
 #define NOT_TEXT_COLUMN -11                 //该列非文本类型（仅支持对文本类型的列进行搜索）
 #define PASSWORD_WRONG -12                  //密码错误（Easy User Management）
+#define PRIMARY_KEY_NOT_IN_LIST -13         //主键名不在传入的列名列表中
 
 typedef struct ListNode
 {
@@ -55,12 +56,12 @@ typedef struct EasyDatabase
     EDBRow* tail;
     EDBRow* tmpptr;
     size_t rowCount;
-    size_t lineSize;                 //一行的长度
+    size_t lineSize;                //一行的长度
     size_t columnCount;             //每行有几个数据
-    size_t primaryKey;              //主键在一行中的索引
+    size_t primaryKeyIndex;         //主键在一行中的索引
     size_t *dataOffset;             //每个数据相比行首的偏移量
     size_t *dataTypes;              //每个数据的类型，>=9即为TEXT类型，数值即为TEXT+长度
-    size_t *dataSizes;               //每个数据的长度
+    size_t *dataSizes;              //每个数据的长度
     char** columnNames;             //列名
     long long dataFileOffset;       //数据在文件中开始的位置
     void** indexheads;              //索引表头指针存储
@@ -77,25 +78,33 @@ typedef EasyDatabase EasyDB;
 int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult);
 int edbNodeDelete(EasyDB *db, EDBRow* row);
 
-/*文件读写API*/
-int edbCreate(const char* filename, size_t columnCount, size_t primaryKeyIndex, size_t dataTypes[], size_t dataSizes[], char* columnNames[]);   //创建数据库
-int edbOpen(const char* filename, EasyDB* db);                                                                                                  //打开数据库
-int edbClose(EasyDB *db);                                                                                                                       //关闭数据库
-int edbSave(EasyDB *db);                                                                                                                        //保存数据库
+/* 文件读写API */
+/* 创建数据库文件(文件名, 列数, 主键所在的列名, 每列的数据类型的数组, 每列的数据大小的数组（仅TEXT和BLOB类型需要，别的列为0即可）, 每列的列名数组) */
+int edbCreate(const char* filename, size_t columnCount, char* primaryKeyColumnName, size_t dataTypes[], size_t dataSizes[], char* columnNames[]);   //创建数据库
+/* 打开数据库(文件名, &EasyDB结构体类型变量) */
+int edbOpen(const char* filename, EasyDB* db);                                                                                                      //打开数据库
+/* 关闭数据库(&EasyDB结构体类型变量) */
+int edbClose(EasyDB *db);                                                                                                                           //关闭数据库
+/* 保存数据库(&EasyDB结构体类型变量) */
+int edbSave(EasyDB *db);                                                                                                                            //保存数据库
 
-/*数据库操作基础API*/
+/* 数据库操作基础API */
+/* 插入(&EasyDB结构体类型变量, 新行) */
 int edbInsert(EasyDB *db, void* row[]);                                                                                                         //插入
+/* 删除(&EasyDB结构体类型变量, 要删除的行的主键（指针）) */
 int edbDelete(EasyDB *db, void* primaryKey);                                                                                                    //删除
-int edbWhere(EasyDB *db, size_t columnIndex, void* inKey, void*** findResults, size_t maxResultNumber, size_t *resultsCount);                   //查找
-int edbUpdate(EasyDB *db, void* primaryKey, size_t updateColumnIndex, void* newData);                                                           //修改
+/* 查找(&EasyDB结构体类型变量, 查找的列名, 查找的键即内容（指针）, 用来容纳结果的数组, 最多查找的个数, &用来接收查找到的个数的变量) */
+int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, size_t maxResultNumber, size_t *resultsCount);                     //查找
+/* 修改(&EasyDB结构体类型变量, 要修改的行的主键（指针）, 要修改的列名, 新的内容（指针）) */
+int edbUpdate(EasyDB *db, void* primaryKey, char* updateColumnName, void* newData);                                                             //修改
 
 /*便利API*/
 long long columnNameToColumnIndex(EasyDB *db, char *columnName);                                                                                //将列名转换为列索引
 void** edbIterBegin(EasyDB *db);                                                                                                                //数据库遍历（返回一个指向第一行数据的指针）
 void** edbIterNext(EasyDB *db);                                                                                                                 //返回指向下一行数据的指针
-int edbSearch(EasyDB *db, size_t columnIndex, char *keyWord, void*** findResults, size_t maxResultNumber, size_t *resultsCount);                //数据库文本搜索（慢）
+int edbSearch(EasyDB *db, char* columnName, char *keyWord, void*** findResults, size_t maxResultNumber, size_t *resultsCount);                  //数据库文本搜索（慢）
 int edbDeleteByArray(EasyDB *db, void** deleteRows[], size_t arraySize);                                                                        //使用搜索得到的数组删除
-int edbDeleteByKeyword(EasyDB *db, size_t columnIndex, char *keyword, size_t maxDeleteCount);                                                   //使用关键词删除
+int edbDeleteByKeyword(EasyDB *db, char* columnName, char *keyword, size_t maxDeleteCount);                                                     //使用关键词删除
 
 /* Easy User Management */
 /* userID所在的列必须是主键列，密码所在的列请将列名设为“password” */
