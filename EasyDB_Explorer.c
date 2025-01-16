@@ -41,7 +41,14 @@ int main(int argc, char const *argv[])
                     printf("%s | ", db.columnNames[i]);
                 }
             }
-            printf("%s\n", db.columnNames[db.columnCount - 1]);
+            if (db.columnCount - 1 == db.primaryKeyIndex)
+            {
+                printf("%s <Primary key>\n", db.columnNames[db.columnCount - 1]);
+            }
+            else
+            {
+                printf("%s\n", db.columnNames[db.columnCount - 1]);
+            }
             for (void** it = edbIterBegin(&db); it != NULL ; it = edbIterNext(&db))
             {
                 size_t j;

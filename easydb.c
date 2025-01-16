@@ -71,11 +71,19 @@ int edbOpen(const char* filename, EasyDB* db)
     db->dbfilename = (char*)malloc((strlen(filename) + 10) * sizeof(char));
     strcpy(db->dbfilename, filename);
     FILE* dbfile = fopen(db->dbfilename, "rb+");
-    if (dbfile == NULL) return FILE_OPEN_ERROR;
+    if (dbfile == NULL)
+    {
+        free(db->dbfilename);
+        return FILE_OPEN_ERROR;
+    }
 
     int readMagicNum;                                                       //魔数检查
     fread(&readMagicNum, 4, 1, dbfile);
-    if (readMagicNum != EDB_MAGIC_NUMBER) return MAGIC_NUMBER_ERROR;
+    if (readMagicNum != EDB_MAGIC_NUMBER)
+    {
+        free(db->dbfilename);
+        return MAGIC_NUMBER_ERROR;
+    }
 
     int ver;                                                                //版本号检查 
     fread(&ver, 4, 1, dbfile);
