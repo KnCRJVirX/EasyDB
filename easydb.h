@@ -5,6 +5,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include "index.h"
 
 #ifndef EASYDB
 #define EASYDB
@@ -30,8 +31,8 @@ typedef double edb_real;
 #define MAGIC_NUMBER_ERROR -2               //魔数错误（非EasyDB数据库文件）
 #define NULL_PTR_ERROR -3                   //空指针错误
 #define PRIMARY_KEY_NOT_UNIQUE -4           //主键重复
-#define PRIMARY_KEY_TYPE_CANNOT_INDEX -5    //仅支持整数和文本的索引，主键必须是整数或文本类型
-#define TYPE_CANNOT_INDEX -6                //仅支持整数和文本的索引
+#define PRIMARY_KEY_TYPE_CANNOT_INDEX -5    //已弃用
+#define TYPE_CANNOT_INDEX -6                //已弃用
 #define KEY_NOT_FOUND -7                    //未找到匹配的行
 #define COLUMN_INDEX_OUT_OF_RANGE -8        //传入的列索引超出原来的列数
 #define COLUMN_NOT_FOUND -9                 //找不到列名对应的列
@@ -51,7 +52,7 @@ typedef ListNode EDBRow;
 
 typedef struct EasyDatabase
 {
-    char dbfilename[256];
+    char* dbfilename;
     EDBRow* head;
     EDBRow* tail;
     EDBRow* tmpptr;
@@ -63,8 +64,8 @@ typedef struct EasyDatabase
     size_t *dataTypes;              //每个数据的类型，>=9即为TEXT类型，数值即为TEXT+长度
     size_t *dataSizes;              //每个数据的长度
     char** columnNames;             //列名
-    fpos_t dataFileOffset;          //数据在文件中开始的位置
-    void** indexheads;              //索引表头指针存储
+    long long dataFileOffset;       //数据在文件中开始的位置
+    IndexNode** indexheads;              //索引表头指针存储
 }EasyDatabase;
 typedef EasyDatabase EasyDB;
 
@@ -102,6 +103,7 @@ int edbUpdate(EasyDB *db, void* primaryKey, char* updateColumnName, void* newDat
 long long columnNameToColumnIndex(EasyDB *db, char *columnName);                                                                                //将列名转换为列索引
 void** edbIterBegin(EasyDB *db);                                                                                                                //数据库遍历（返回一个指向第一行数据的指针）
 void** edbIterNext(EasyDB *db);                                                                                                                 //返回指向下一行数据的指针
+void* edbGet(EasyDB *db, void* primaryKey, char* columnName);
 int edbSearch(EasyDB *db, char* columnName, char *keyWord, void*** findResults, size_t maxResultNumber, size_t *resultsCount);                  //数据库文本搜索（慢）
 int edbDeleteByArray(EasyDB *db, void** deleteRows[], size_t arraySize);                                                                        //使用搜索得到的数组删除
 int edbDeleteByKeyword(EasyDB *db, char* columnName, char *keyword, size_t maxDeleteCount);                                                     //使用关键词删除

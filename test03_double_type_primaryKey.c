@@ -11,14 +11,14 @@ int main(int argc, char const *argv[])
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
     EasyDB db;
-    const char* dbfilename = "test00_interactive_test.db";
+    const char* dbfilename = "test03_double_type_primaryKey.db";
     size_t dataTypes[] = {EDB_TYPE_INT, EDB_TYPE_TEXT, EDB_TYPE_REAL};
     size_t dataLenths[] = {0, NAME_SIZE, 0};
     char* colNames[] = {"ID", "Name", "Balance"};
     int retval = edbOpen(dbfilename, &db);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(dbfilename, 3, "ID", dataTypes, dataLenths, colNames);
+        edbCreate(dbfilename, 3, "Balance", dataTypes, dataLenths, colNames);
         edbOpen(dbfilename, &db);
     }
     
@@ -36,11 +36,6 @@ int main(int argc, char const *argv[])
     void* newRow[] = {&newID, newName, &newBalance};
     size_t columnIndex;
 
-    // IndexTEXTNode *ptr1, *ptr2;
-    // HASH_ITER(hh, (IndexTEXTNode*)db.indexheads[1], ptr1, ptr2){
-    //     printf("%lld\t%-15s\t%lf\n", *(edb_int*)(((void**)ptr1->data)[0]), ((void**)ptr1->data)[2], *(double*)(((void**)ptr1->data)[2]));
-    // }
-
     while (1)
     {
         printf("Interactive Test>");
@@ -55,7 +50,7 @@ int main(int argc, char const *argv[])
             printf("%s\t\t%s\t\t%s\n", db.columnNames[0], db.columnNames[1], db.columnNames[2]);
             for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))      //遍历打印测试数据
             {
-                printf("%d\t%-15s\t%lf\n", Int(it[0]), it[1], Real(it[2]));
+                printf("%-15d\t%-15s\t%lf\n", Int(it[0]), it[1], Real(it[2]));
             }
             printf("\n");
         }
@@ -94,8 +89,8 @@ int main(int argc, char const *argv[])
         }
         else if (!strcmp(command, "delete"))
         {
-            scanf("%lld", &tmpInputID);
-            retval = edbDelete(&db, &tmpInputID);
+            scanf("%lf", &tmpInputBalance);
+            retval = edbDelete(&db, &tmpInputBalance);
             if (retval == KEY_NOT_FOUND)
             {
                 printf("Not found!\n");
@@ -107,21 +102,20 @@ int main(int argc, char const *argv[])
         }
         else if (!strcmp(command, "update"))
         {
-            scanf("%lld %s %s", &tmpInputID, inColName, buf);
+            scanf("%lf %s %s", &tmpInputBalance, inColName, buf);
             columnIndex = columnNameToColumnIndex(&db, inColName);
             switch (db.dataTypes[columnIndex])
             {
-            case EDB_TYPE_INT:
-                edb_int newInputID;
-                newInputID = atoll(buf);
-                retval = edbUpdate(&db, &tmpInputID, "ID", &newInputID);
+            case EDB_TYPE_INT:;
+                newID = atoll(buf);
+                retval = edbUpdate(&db, &tmpInputBalance, "ID", &newID);
                 break;
             case EDB_TYPE_TEXT:
-                retval = edbUpdate(&db, &tmpInputID, "Name", buf);
+                retval = edbUpdate(&db, &tmpInputBalance, "Name", buf);
                 break;
             case EDB_TYPE_REAL:
-                tmpInputBalance = atof(buf);
-                retval = edbUpdate(&db, &tmpInputID, "Balance", &tmpInputBalance);
+                newBalance = atof(buf);
+                retval = edbUpdate(&db, &tmpInputBalance, "Balance", &newBalance);
             default:
                 break;
             }

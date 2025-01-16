@@ -1,43 +1,22 @@
 #include <stdio.h>
-#include "easydb.h"
 #include "src/uthash.h"
 
 #ifndef INDEX
 #define INDEX
 #define NODE_NOT_EXIST -1
 
-typedef struct IndexINTNode
-{
-    long long key;
-    void* data;
-    struct IndexINTNode* next;
-    UT_hash_handle hh;
-}IndexINTNode;
-
-typedef struct IndexTEXTNode
-{
-    char* key;
-    void* data;
-    struct IndexTEXTNode* next;
-    UT_hash_handle hh;
-}IndexTEXTNode;
-
 typedef struct IndexNode
 {
     void* key;
+    size_t keyLenth;
     void* data;
     struct IndexNode* next;
     UT_hash_handle hh;
 }IndexNode;
 
-int IndexInsertINT(IndexINTNode** head, edb_int inKey, void* data);
-int IndexInsertTEXT(IndexTEXTNode** head, char* inKey, void* data);
-// int IndexInsert(IndexNode** head, void* inKey, size_t keyLenth, void* data);
-size_t IndexFindINT(IndexINTNode** head, edb_int inKey, void** findResult, size_t len);
-size_t IndexFindTEXT(IndexTEXTNode** head, char* inKey, void** findResult, size_t len);
-int IndexDelINT(IndexINTNode** head, edb_int inKey, void* data_ptr);
-int IndexDelTEXT(IndexTEXTNode** head, char* inKey, void* data_ptr);
-int IndexClearINT(IndexINTNode** head);
-int IndexClearTEXT(IndexTEXTNode** head);
+int IndexInsert(IndexNode** head, void* inKey, size_t keyLenth, void* data);
+size_t IndexFind(IndexNode** head, void* inKey, size_t keyLenth, void** findResults, size_t len);
+int IndexDel(IndexNode** head, void* inKey, size_t keyLenth, void* data_ptr);
+int IndexClear(IndexNode** head);
 
 #endif

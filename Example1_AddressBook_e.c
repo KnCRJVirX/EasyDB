@@ -1,4 +1,4 @@
-#include "easydb.h"
+#include "易库.h"
 #include <windows.h>
 #define NAME_SIZE 50
 #define CONTACT_SIZE 100
@@ -10,24 +10,24 @@ int main(int argc, char const *argv[])
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
 
-    EasyDB db;
+    易库 数据库;
     int retval;
-    char *dbfilename = "Example1_AddressBook.db";
+    char *数据库文件名 = "Example1_AddressBook.db";
     char* colNames[] = {"Name", "Contact", "Remarks"};
     size_t dataTypes[] = {EDB_TYPE_TEXT, EDB_TYPE_TEXT, EDB_TYPE_TEXT};
     size_t dataSizes[] = {NAME_SIZE, CONTACT_SIZE, REMARKS_SIZE};
 
     if (argc > 1)
     {
-        dbfilename = argv[1];
+        数据库文件名 = argv[1];
     }
     
 
-    retval = edbOpen(dbfilename, &db);
-    if (retval == FILE_OPEN_ERROR)
+    retval = 打开数据库(数据库文件名, &数据库);
+    if (retval == 文件打开错误)
     {
-        edbCreate(dbfilename, 3, "Name", dataTypes, dataSizes, colNames);
-        edbOpen(dbfilename, &db);
+        创建数据库(数据库文件名, 3, "Name", dataTypes, dataSizes, colNames);
+        打开数据库(数据库文件名, &数据库);
     }
 
     char buf[200];
@@ -44,10 +44,10 @@ int main(int argc, char const *argv[])
 
         if (!strcmp(command, "list") || !strcmp(command, "ls"))
         {
-            printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
-            for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))
+            printf("%s | %s | %s\n", colNames[0], colNames[1], colNames[2]);
+            for (void** it = edbIterBegin(&数据库); it != NULL; it = edbIterNext(&数据库))
             {
-                printf("%-15s\t%-15s\t%s\n", it[0], it[1], it[2]);
+                printf("%s | %s | %s\n", it[0], it[1], it[2]);
             }
         }
         else if (!strcmp(command, "add")) //增
@@ -62,12 +62,12 @@ int main(int argc, char const *argv[])
             fgets(newRemarks, REMARKS_SIZE, stdin);
             if (strchr(newRemarks, '\n')) *(strchr(newRemarks, '\n')) = 0;
             if (!strcmp(newRemarks, "/")) newRemarks[0] = 0;
-            retval = edbInsert(&db, newRow);
+            retval = edbInsert(&数据库, newRow);
             if (retval == PRIMARY_KEY_NOT_UNIQUE)
             {
                 printf("Name should be unique!\n");
             }
-            else if (retval == SUCCESS)
+            else if (retval == 操作成功完成)
             {
                 printf("OK!\n");
             }
@@ -77,12 +77,12 @@ int main(int argc, char const *argv[])
             printf("Name: ");
             fgets(newName, NAME_SIZE, stdin);
             if (strchr(newName, '\n')) *(strchr(newName, '\n')) = 0;
-            retval = edbDelete(&db, newName);
+            retval = edbDelete(&数据库, newName);
             if (retval == KEY_NOT_FOUND)
             {
                 printf("Not found!\n");
             }
-            else if (retval == SUCCESS)
+            else if (retval == 操作成功完成)
             {
                 printf("OK!\n");
             }
@@ -92,17 +92,17 @@ int main(int argc, char const *argv[])
             printf("Name: ");
             fgets(newName, NAME_SIZE, stdin);
             if (strchr(newName, '\n')) *(strchr(newName, '\n')) = 0;
-            retval = edbWhere(&db, "Name", newName, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
+            retval = edbWhere(&数据库, "Name", newName, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
             if (resultsCount == 0)
             {
                 printf("Not found!\n");
             }
             else if (resultsCount > 0)
             {
-                printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
+                printf("%s | %s | %s\n", colNames[0], colNames[1], colNames[2]);
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    printf("%-15s\t%-15s\t%s\n", searchResults[i][0], searchResults[i][1], searchResults[i][2]);
+                    printf("%s | %s | %s\n", searchResults[i][0], searchResults[i][1], searchResults[i][2]);
                 }
             }
         }
@@ -111,17 +111,17 @@ int main(int argc, char const *argv[])
             printf("Contact: ");
             fgets(newContact, CONTACT_SIZE, stdin);
             if (strchr(newContact, '\n')) *(strchr(newContact, '\n')) = 0;
-            retval = edbWhere(&db, "Contact", newContact, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
+            retval = edbWhere(&数据库, "Contact", newContact, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
             if (resultsCount == 0)
             {
                 printf("Not found!\n");
             }
             else if (resultsCount > 0)
             {
-                printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
+                printf("%s | %s | %s\n", colNames[0], colNames[1], colNames[2]);
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    printf("%-15s\t%-15s\t%s\n", searchResults[i][0], searchResults[i][1], searchResults[i][2]);
+                    printf("%s | %s | %s\n", searchResults[i][0], searchResults[i][1], searchResults[i][2]);
                 }
             }
         }
@@ -130,7 +130,7 @@ int main(int argc, char const *argv[])
             printf("Name (You want to edit) : ");
             fgets(buf, NAME_SIZE, stdin);
             if (strchr(buf, '\n')) *(strchr(buf, '\n')) = 0;
-            retval = edbWhere(&db, "Name", buf, searchResults, 1, &resultsCount);
+            retval = edbWhere(&数据库, "Name", buf, searchResults, 1, &resultsCount);
             if (resultsCount == 0)
             {
                 printf("Not found!\n");
@@ -138,8 +138,7 @@ int main(int argc, char const *argv[])
             }
             else
             {
-                printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
-                printf("%-15s\t%-15s\t%s\n", searchResults[0][0], searchResults[0][1], searchResults[0][2]);
+                printf("%s | %s | %s\n", searchResults[0][0], searchResults[0][1], searchResults[0][2]);
             }
 
             printf("New Name (Input '/' to keep): ");
@@ -154,22 +153,22 @@ int main(int argc, char const *argv[])
             fgets(newRemarks, REMARKS_SIZE, stdin);
             if (strchr(newRemarks, '\n')) *(strchr(newRemarks, '\n')) = 0;
 
+            if (strcmp(newName, "/"))
+            {
+                edbUpdate(&数据库, buf, "Name", newName);
+            }
             if (strcmp(newContact, "/"))
             {
-                edbUpdate(&db, buf, "Contact", newContact);
+                edbUpdate(&数据库, buf, "Contact", newContact);
             }
             if (!strcmp(newRemarks, "/clear"))
             {
                 newRemarks[0] = 0;
-                edbUpdate(&db, buf, "Remarks", newRemarks);
+                edbUpdate(&数据库, buf, "Remarks", newRemarks);
             }
             else if (strcmp(newRemarks, "/"))
             {
-                edbUpdate(&db, buf, "Remarks", newRemarks);
-            }
-            if (strcmp(newName, "/"))
-            {
-                edbUpdate(&db, buf, "Name", newName);
+                edbUpdate(&数据库, buf, "Remarks", newRemarks);
             }
         }    
         else if (!strcmp(command, "search") || !strcmp(command, "s"))
@@ -177,17 +176,17 @@ int main(int argc, char const *argv[])
             printf("Name: ");
             fgets(buf, NAME_SIZE, stdin);
             if (strchr(buf, '\n')) *(strchr(buf, '\n')) = 0;
-            retval = edbSearch(&db, "Name", buf, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
+            retval = edbSearch(&数据库, "Name", buf, searchResults, SEARCH_RESULTS_MAX_COUNT, &resultsCount);
             if (resultsCount == 0)
             {
                 printf("Not found!\n");
             }
             else if (resultsCount > 0)
             {
-                printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
+                printf("%s | %s | %s\n", colNames[0], colNames[1], colNames[2]);
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    printf("%-15s\t%-15s\t%s\n", searchResults[i][0], searchResults[i][1], searchResults[i][2]);
+                    printf("%s | %s | %s\n", searchResults[i][0], searchResults[i][1], searchResults[i][2]);
                 }
             }
         }
@@ -197,7 +196,7 @@ int main(int argc, char const *argv[])
         }
         else if (!strcmp(command, "exit") || !strcmp(command, "quit"))
         {
-            edbClose(&db);
+            edbClose(&数据库);
             return 0;
         }
         else
