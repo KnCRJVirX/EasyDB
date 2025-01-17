@@ -65,6 +65,7 @@ int IndexDel(IndexNode** head, void* inKey, size_t keyLenth, void* data_ptr)
         {
             IndexNode* newNode = findNode->next;
             HASH_DEL(*head, findNode);
+            free(findNode);
             HASH_ADD_KEYPTR(hh, *head, newNode->key, newNode->keyLenth, newNode);
             return 0;
         }

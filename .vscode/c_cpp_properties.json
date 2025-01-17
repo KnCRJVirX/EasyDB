@@ -6,6 +6,7 @@
                 "${workspaceFolder}\\**",
                 "C:\\MinGW\\lib\\gcc\\x86_64-w64-mingw32\\13.2.0\\include\\*",
                 "C:\\MinGW\\x86_64-w64-mingw32\\include\\**",
+                "${workspaceFolder}",
                 "${workspaceFolder}"
             ],
             "defines": [

@@ -24,31 +24,6 @@
                 "isDefault": true
             },
             "detail": "调试器生成的任务。"
-        },
-        {
-            "type": "cppbuild",
-            "label": "易库编译",
-            "command": "C:\\w64devkit\\bin\\gcc.exe",
-            "args": [
-                "-static",
-                "-g",
-                ".\\易库.c",
-                ".\\index.c",
-                "${file}",
-                "-o",
-                "${fileDirname}\\run.exe"
-            ],
-            "options": {
-                "cwd": "${fileDirname}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "detail": "调试器生成的任务。"
         }
     ],
     "version": "2.0.0"

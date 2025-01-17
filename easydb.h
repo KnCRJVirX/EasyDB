@@ -106,7 +106,8 @@ void** edbIterNext(EasyDB *db);                                                 
 void* edbGet(EasyDB *db, void* primaryKey, char* columnName);
 int edbSearch(EasyDB *db, char* columnName, char *keyWord, void*** findResults, size_t maxResultNumber, size_t *resultsCount);                  //数据库文本搜索（慢）
 int edbDeleteByArray(EasyDB *db, void** deleteRows[], size_t arraySize);                                                                        //使用搜索得到的数组删除
-int edbDeleteByKeyword(EasyDB *db, char* columnName, char *keyword, size_t maxDeleteCount);                                                     //使用关键词删除
+int edbDeleteByKeyword(EasyDB *db, char* columnName, char *keyword);                                                                            //使用关键词删除
+int edbDeleteByKey(EasyDB *db, char* columnName, void* inKey);                                                                                   //使用键删除
 
 /* Easy User Management */
 /* userID所在的列必须是主键列，密码所在的列请将列名设为“password” */
