@@ -1,5 +1,7 @@
 #include "easydb.h"
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #define NAME_SIZE 50
 #define CONTACT_SIZE 100
 #define REMARKS_SIZE 200
@@ -7,8 +9,10 @@
 
 int main(int argc, char const *argv[])
 {
+    #ifdef _WIN32
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
+    #endif
 
     EasyDB db;
     int retval;
@@ -47,7 +51,7 @@ int main(int argc, char const *argv[])
             printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
             for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))
             {
-                printf("%-15s\t%-15s\t%s\n", it[0], it[1], it[2]);
+                printf("%-15s\t%-15s\t%s\n", Text(it[0]), Text(it[1]), Text(it[2]));
             }
         }
         else if (!strcmp(command, "add")) //增
@@ -102,7 +106,7 @@ int main(int argc, char const *argv[])
                 printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    printf("%-15s\t%-15s\t%s\n", searchResults[i][0], searchResults[i][1], searchResults[i][2]);
+                    printf("%-15s\t%-15s\t%s\n", Text(searchResults[i][0]), Text(searchResults[i][1]), Text(searchResults[i][2]));
                 }
             }
         }
@@ -121,7 +125,7 @@ int main(int argc, char const *argv[])
                 printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    printf("%-15s\t%-15s\t%s\n", searchResults[i][0], searchResults[i][1], searchResults[i][2]);
+                    printf("%-15s\t%-15s\t%s\n", Text(searchResults[i][0]), Text(searchResults[i][1]), Text(searchResults[i][2]));
                 }
             }
         }
@@ -139,7 +143,7 @@ int main(int argc, char const *argv[])
             else
             {
                 printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
-                printf("%-15s\t%-15s\t%s\n", searchResults[0][0], searchResults[0][1], searchResults[0][2]);
+                printf("%-15s\t%-15s\t%s\n", Text(searchResults[0][0]), Text(searchResults[0][1]), Text(searchResults[0][2]));
             }
 
             printf("New Name (Input '/' to keep): ");
@@ -187,7 +191,7 @@ int main(int argc, char const *argv[])
                 printf("%s\t\t%s\t\t%s\n", colNames[0], colNames[1], colNames[2]);
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    printf("%-15s\t%-15s\t%s\n", searchResults[i][0], searchResults[i][1], searchResults[i][2]);
+                    printf("%-15s\t%-15s\t%s\n", Text(searchResults[i][0]), Text(searchResults[i][1]), Text(searchResults[i][2]));
                 }
             }
         }
