@@ -316,7 +316,8 @@ int processGradeTable(char* tableName)
             printf("%-15s\t%-15s\t素质类项目数量\n", "总分", "平均");
             EDB_ITER(db, it)
             {
-                int projectCount = edbWhere(&dbPo, "学号", it[0], NULL, 0, NULL);
+                size_t projectCount;
+                edbWhere(&dbPo, "学号", it[0], NULL, 0, &projectCount);
                 double sum = 0;
                 printf("%-10s\t%-15s\t", Text(it[0]), Text(it[1]));
                 for (size_t i = 2; i < db.columnCount; i++)
@@ -324,7 +325,7 @@ int processGradeTable(char* tableName)
                     printf("%-9.2lf\t", Real(it[i]));
                     sum += Real(it[i]);
                 }
-                printf("%-9.2lf\t%-9.2lf\t%d\n", sum, sum / (db.columnCount - 2), projectCount);
+                printf("%-9.2lf\t%-9.2lf\t%lld\n", sum, sum / (db.columnCount - 2), projectCount);
             }
             break;
         case 3:

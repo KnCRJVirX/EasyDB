@@ -417,9 +417,12 @@ int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, siz
         retval = IndexFind(&db->indexheads[columnIndex], inKey, db->dataSizes[columnIndex], (void**)findResults, maxResultNumber);
         break;
     }
-    for (size_t i = 0; i < retval; i++)
+    if (findResults != NULL)
     {
-        findResults[i] = ((EDBRow*)(findResults[i]))->data;
+        for (size_t i = 0; i < retval; i++)
+        {
+            findResults[i] = ((EDBRow*)(findResults[i]))->data;
+        }
     }
     if (resultsCount != NULL)
     {
