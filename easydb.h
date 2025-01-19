@@ -15,7 +15,7 @@ typedef int64_t edb_int;
 typedef double edb_real;
 
 #define EDB_MAGIC_NUMBER 0xDBCEEA00     //魔数
-#define EDB_VERSION 0                   //版本号
+#define EDB_VERSION 1                   //版本号
 
 #define EDB_INT_SIZE 8  //整数类型长度
 #define EDB_CHAR_SIZE 1 //字符类型长度
@@ -56,6 +56,8 @@ typedef struct EasyDatabase
     EDBRow* head;
     EDBRow* tail;
     EDBRow* tmpptr;
+    int version;
+    char* tableName;
     size_t rowCount;
     size_t lineSize;                //一行的长度
     size_t columnCount;             //每行有几个数据
@@ -71,17 +73,18 @@ typedef EasyDatabase EasyDB;
 
 
 /*便利宏*/
-#define Int(x) *(edb_int*)(x)   //将返回的void指针转换为整数指针并解引用
-#define Real(x) *(double*)(x)   //将返回的void指针转换为浮点数指针并解引用
-#define Text(x) (char*)(x)      //将返回的void指针转换为字符指针
+#define Int(x) (*(edb_int*)(x))   //将返回的void指针转换为整数指针并解引用
+#define Real(x) (*(double*)(x))   //将返回的void指针转换为浮点数指针并解引用
+#define Text(x) ((char*)(x))      //将返回的void指针转换为字符指针
+#define EDB_ITER(db, iter_ptr) for((iter_ptr) = edbIterBegin(&(db)); (iter_ptr) != NULL; (iter_ptr) = edbIterNext(&(db)))
 
 /*内部API*/
 int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult);
 int edbNodeDelete(EasyDB *db, EDBRow* row);
 
 /* 文件读写API */
-/* 创建数据库文件(文件名, 列数, 主键所在的列名, 每列的数据类型的数组, 每列的数据大小的数组（仅TEXT和BLOB类型需要，别的列为0即可）, 每列的列名数组) */
-int edbCreate(const char* filename, size_t columnCount, char* primaryKeyColumnName, size_t dataTypes[], size_t dataSizes[], char* columnNames[]);   //创建数据库
+/* 创建数据库文件(文件名, 表名, 列数, 主键所在的列名, 每列的数据类型的数组, 每列的数据大小的数组（仅TEXT和BLOB类型需要，别的列为0即可）, 每列的列名数组) */
+int edbCreate(const char* filename, const char* tableName, size_t columnCount, char* primaryKeyColumnName, size_t dataTypes[], size_t dataSizes[], char* columnNames[]);   //创建数据库
 /* 打开数据库(文件名, &EasyDB结构体类型变量) */
 int edbOpen(const char* filename, EasyDB* db);                                                                                                      //打开数据库
 /* 关闭数据库(&EasyDB结构体类型变量) */

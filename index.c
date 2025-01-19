@@ -34,10 +34,12 @@ size_t IndexFind(IndexNode** head, void* inKey, size_t keyLenth, void** findResu
     }
     else
     {
-        if (findResults == NULL || len == 0) return 1;
-        while (findNode != NULL && count < len)
+        while (findNode != NULL && (count < len || len == 0))
         {
-            findResults[count++] = findNode->data;
+            if (findResults != NULL)
+            {
+                findResults[count++] = findNode->data;
+            }
             findNode = findNode->next;
         }
         return count;

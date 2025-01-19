@@ -7,6 +7,7 @@ int main(int argc, char const *argv[])
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
     const char* dbfilename = "test02_EUM_interactive_test.db";
+    const char* tablename = "Test02: Easy User Management interactive test";
     size_t dataTypes[]= {EDB_TYPE_TEXT, EDB_TYPE_TEXT, EDB_TYPE_INT};
     size_t dataSizes[] = {50, 100, 0};
     char* colNames[] = {"UserID", "password", "VIPLevel"};
@@ -15,7 +16,7 @@ int main(int argc, char const *argv[])
     int retval = edbOpen(dbfilename, &db);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(dbfilename, 3, 0, dataTypes, dataSizes, colNames);
+        edbCreate(dbfilename, tablename, 3, "UserID", dataTypes, dataSizes, colNames);
         edbOpen(dbfilename, &db);
     }
     

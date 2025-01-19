@@ -17,6 +17,7 @@ int main(int argc, char const *argv[])
     EasyDB db;
     int retval;
     char *dbfilename = "Example1_AddressBook.db";
+    const char* tableName = "AddressBook";
     char* colNames[] = {"Name", "Contact", "Remarks"};
     size_t dataTypes[] = {EDB_TYPE_TEXT, EDB_TYPE_TEXT, EDB_TYPE_TEXT};
     size_t dataSizes[] = {NAME_SIZE, CONTACT_SIZE, REMARKS_SIZE};
@@ -30,7 +31,7 @@ int main(int argc, char const *argv[])
     retval = edbOpen(dbfilename, &db);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(dbfilename, 3, "Name", dataTypes, dataSizes, colNames);
+        edbCreate(dbfilename, tableName, 3, "Name", dataTypes, dataSizes, colNames);
         edbOpen(dbfilename, &db);
     }
 

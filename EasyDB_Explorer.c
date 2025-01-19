@@ -30,6 +30,10 @@ int main(int argc, char const *argv[])
         scanf("%s", command);
         if (!strcmp(command, "show"))
         {
+            if (db.version >= 1)
+            {
+                printf("Table name: \"%s\"\n", db.tableName);
+            }
             for (size_t i = 0; i < db.columnCount - 1; i++)
             {
                 if (i == db.primaryKeyIndex)

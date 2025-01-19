@@ -12,13 +12,14 @@ int main(int argc, char const *argv[])
     SetConsoleOutputCP(65001);
     EasyDB db;
     const char* dbfilename = "test00_interactive_test.db";
+    const char* tablename = "Test00: Interactive test";
     size_t dataTypes[] = {EDB_TYPE_INT, EDB_TYPE_TEXT, EDB_TYPE_REAL};
     size_t dataLenths[] = {0, NAME_SIZE, 0};
     char* colNames[] = {"ID", "Name", "Balance"};
     int retval = edbOpen(dbfilename, &db);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(dbfilename, 3, "ID", dataTypes, dataLenths, colNames);
+        edbCreate(dbfilename, tablename, 3, "ID", dataTypes, dataLenths, colNames);
         edbOpen(dbfilename, &db);
     }
     

@@ -8,6 +8,7 @@
         "stdint.h": "c",
         "time.h": "c",
         "pthread_time.h": "c",
-        "index.h": "c"
+        "index.h": "c",
+        "windows.h": "c"
     }
 }

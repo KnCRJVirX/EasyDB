@@ -1,7 +1,7 @@
 #include "easydb.h"
 #include "index.h"
 
-int edbCreate(const char* filename, size_t columnCount, char* primaryKeyColumnName, size_t dataTypes[], size_t dataSizes[], char* columnNames[])
+int edbCreate(const char* filename, const char* tableName, size_t columnCount, char* primaryKeyColumnName, size_t dataTypes[], size_t dataSizes[], char* columnNames[])
 {
     if (filename == NULL) return NULL_PTR_ERROR;
     size_t primaryKeyIndex = -1;
@@ -59,6 +59,7 @@ int edbCreate(const char* filename, size_t columnCount, char* primaryKeyColumnNa
     {
         fwrite(columnNames[i], sizeof(char), strlen(columnNames[i]) + 1, dbfile); //+1是为了把结束符也写入文件
     }
+    fwrite(tableName, sizeof(char), strlen(tableName) + 1, dbfile);
     fwrite(&primaryKeyIndex, EDB_INT_SIZE, 1, dbfile);
     fclose(dbfile);
     return SUCCESS;
@@ -85,8 +86,7 @@ int edbOpen(const char* filename, EasyDB* db)
         return MAGIC_NUMBER_ERROR;
     }
 
-    int ver;                                                                //版本号检查 
-    fread(&ver, 4, 1, dbfile);
+    fread(&db->version, 4, 1, dbfile);                                      //版本号检查
 
     fread(&db->rowCount, EDB_INT_SIZE, 1, dbfile);                          //读取行数
     fread(&db->lineSize, EDB_INT_SIZE, 1, dbfile);                           //读取行长度
@@ -112,6 +112,19 @@ int edbOpen(const char* filename, EasyDB* db)
         } while (c != 0 && c < 1024);
         db->columnNames[i] = (char*)malloc(colNameLen);
         strcpy(db->columnNames[i], colNameBuf);
+    }
+
+    if (db->version >= 1)
+    {
+        db->tableName = (char*)malloc(1024 * sizeof(char));
+        char c;
+        int tableNameLen = 0;
+        do
+        {
+            c = fgetc(dbfile);
+            db->tableName[tableNameLen++] = c;
+        } while (c != 0 && tableNameLen < 1024);
+        
     }
 
     fread(&db->primaryKeyIndex, EDB_INT_SIZE, 1, dbfile);                        //读取主键索引
@@ -240,6 +253,10 @@ int edbClose(EasyDB *db)
     free(db->dataSizes);
     free(db->indexheads);
     free(db->dbfilename);
+    if (db->version >= 1)
+    {
+        free(db->tableName);
+    }
     fclose(dbfile);
     return SUCCESS;
 }
@@ -404,7 +421,10 @@ int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, siz
     {
         findResults[i] = ((EDBRow*)(findResults[i]))->data;
     }
-    *resultsCount = retval;
+    if (resultsCount != NULL)
+    {
+        *resultsCount = retval;
+    }
     
     return SUCCESS;
 }
@@ -658,8 +678,6 @@ int easyLogin(EasyDB *db, char* userID, char* password, void*** retUserData)
     sha256(password, passwd_sha256);
 
     void **userData = user->data;
-    // printf("%s\n", userData[passwdColIndex]);
-    // printf("%s\n", passwd_sha256);
     if (!strcmp(userData[passwdColIndex], passwd_sha256))
     {
         *retUserData = userData;

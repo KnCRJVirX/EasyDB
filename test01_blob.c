@@ -14,7 +14,9 @@ int main(int argc, char const *argv[])
     size_t dataTypes[] = {EDB_TYPE_BLOB};
     size_t dataSizes[] = {sizeof(Person)};
     char *colNames[] = {"AddressBook"};
-    edbCreate("test01_blob.db", 1, "AddressBook", dataTypes, dataSizes, colNames);
+    const char* dbfilename = "test01_blob.db";
+    const char* tablename = "Test01: Blob";
+    edbCreate(dbfilename, tablename, 1, "AddressBook", dataTypes, dataSizes, colNames);
     
     EasyDB db;
     edbOpen("test01_blob.db", &db);
