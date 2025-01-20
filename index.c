@@ -2,7 +2,6 @@
 
 int IndexInsert(IndexNode** head, void* inKey, size_t keyLenth, void* data)
 {
-    
     IndexNode* newNode = (IndexNode*)malloc(sizeof(IndexNode));
     newNode->key = inKey;
     newNode->keyLenth = keyLenth;

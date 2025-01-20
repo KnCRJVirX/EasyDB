@@ -81,6 +81,8 @@ typedef EasyDatabase EasyDB;
 /*内部API*/
 int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult);
 int edbNodeDelete(EasyDB *db, EDBRow* row);
+int edbDefaultCompareInts(const void *a, const void *b);
+int edbDefaultCompareDoubles(const void *a, const void *b);
 
 /* 文件读写API */
 /* 创建数据库文件(文件名, 表名, 列数, 主键所在的列名, 每列的数据类型的数组, 每列的数据大小的数组（仅TEXT和BLOB类型需要，别的列为0即可）, 每列的列名数组) */
@@ -94,32 +96,33 @@ int edbSave(EasyDB *db);                                                        
 
 /* 数据库操作基础API */
 /* 插入(&EasyDB结构体类型变量, 新行) */
-int edbInsert(EasyDB *db, void* row[]);                                                                                                         //插入
+int edbInsert(EasyDB *db, void* row[]);                                                                                             //插入
 /* 删除(&EasyDB结构体类型变量, 要删除的行的主键（指针）) */
-int edbDelete(EasyDB *db, void* primaryKey);                                                                                                    //删除
+int edbDelete(EasyDB *db, void* primaryKey);                                                                                        //删除
 /* 查找(&EasyDB结构体类型变量, 查找的列名, 查找的键即内容（指针）, 用来容纳结果的数组, 最多查找的个数, &用来接收查找到的个数的变量) */
-int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, size_t maxResultNumber, size_t *resultsCount);                     //查找
+int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, size_t maxResultNumber, size_t *resultsCount);         //查找
 /* 修改(&EasyDB结构体类型变量, 要修改的行的主键（指针）, 要修改的列名, 新的内容（指针）) */
-int edbUpdate(EasyDB *db, void* primaryKey, char* updateColumnName, void* newData);                                                             //修改
+int edbUpdate(EasyDB *db, void* primaryKey, char* updateColumnName, void* newData);                                                 //修改
 
 /*便利API*/
-long long columnNameToColumnIndex(EasyDB *db, char *columnName);                                                                                //将列名转换为列索引
-void** edbIterBegin(EasyDB *db);                                                                                                                //数据库遍历（返回一个指向第一行数据的指针）
-void** edbIterNext(EasyDB *db);                                                                                                                 //返回指向下一行数据的指针
+long long columnNameToColumnIndex(EasyDB *db, char *columnName);                                                                    //将列名转换为列索引
+void** edbIterBegin(EasyDB *db);                                                                                                    //数据库遍历（返回一个指向第一行数据的指针）
+void** edbIterNext(EasyDB *db);                                                                                                     //返回指向下一行数据的指针
 void* edbGet(EasyDB *db, void* primaryKey, char* columnName);
-int edbSearch(EasyDB *db, char* columnName, char *keyWord, void*** findResults, size_t maxResultNumber, size_t *resultsCount);                  //数据库文本搜索（慢）
-int edbDeleteByArray(EasyDB *db, void** deleteRows[], size_t arraySize);                                                                        //使用搜索得到的数组删除
-int edbDeleteByKeyword(EasyDB *db, char* columnName, char *keyword);                                                                            //使用关键词删除
-int edbDeleteByKey(EasyDB *db, char* columnName, void* inKey);                                                                                   //使用键删除
+int edbSearch(EasyDB *db, char* columnName, char *keyWord, void*** findResults, size_t maxResultNumber, size_t *resultsCount);      //数据库文本搜索（慢）
+int edbDeleteByArray(EasyDB *db, void** deleteRows[], size_t arraySize);                                                            //使用搜索得到的数组删除
+int edbDeleteByKeyword(EasyDB *db, char* columnName, char *keyword);                                                                //使用关键词删除
+int edbDeleteByKey(EasyDB *db, char* columnName, void* inKey);                                                                      //使用键删除
+int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const void*));                                            //排序
 
 /* Easy User Management */
 /* userID所在的列必须是主键列，密码所在的列请将列名设为“password” */
 /* 使用此系列功能处理的用户密码将自动进行SHA256摘要（加密）*/
-int easyLogin(EasyDB *db, char* userID, char* password, void*** retUserData);                                                                   //登录
-int easyAddUser(EasyDB *db, void* newRow[]);                                                                                                    //新增用户
-int easyDeleteUser(EasyDB *db, char* userID);                                                                                                   //删除用户
-int easyResetPassword(EasyDB *db, char* userID, char* newPassword);                                                                             //重置用户密码
-char* uuid(char *UUID);                                                                                                                         //生成UUID v4
-char* sha256(const char* input, char* SHA256);                                                                                                  //对输入的字符串进行sha256摘要
+int easyLogin(EasyDB *db, char* userID, char* password, void*** retUserData);                                                       //登录
+int easyAddUser(EasyDB *db, void* newRow[]);                                                                                        //新增用户
+int easyDeleteUser(EasyDB *db, char* userID);                                                                                       //删除用户
+int easyResetPassword(EasyDB *db, char* userID, char* newPassword);                                                                 //重置用户密码
+char* uuid(char *UUID);                                                                                                             //生成UUID v4
+char* sha256(const char* input, char* SHA256);                                                                                      //对输入的字符串进行sha256摘要
 
 #endif

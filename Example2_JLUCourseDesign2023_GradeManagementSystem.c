@@ -33,6 +33,13 @@ char* UTF8ToGBK(char *utf8_str) {
 }
 #endif
 
+int cmpDoubles(const void *a, const void *b)
+{
+    if (*(double*)a - *(double*)b < 0) return 1;
+    else if (*(double*)a - *(double*)b > 0) return -1;
+    return 0;
+}
+
 int Menu(char* commandList[], char* commandAbbrList[], char* discribe[], size_t commandCount)
 {
     printf("\n");
@@ -251,6 +258,8 @@ int processGradeTable(char* tableName)
     size_t colIndex;
     void** searchResults[100];
     size_t resultsCount = 0;
+    double sum, avg;
+    size_t projectCount;
 
     #ifdef __WIN32
     UTF8ToGBK(dbfilename);
@@ -271,9 +280,9 @@ int processGradeTable(char* tableName)
         return -1;
     }
 
-    char* commandList[] = {"quit", "help", "show", "add", "edit", "delete", "findID", "findname", "searchID", "searchname", "projectMgr"};
-    char* commandAbbrList[] = {"q", "h", "s", "a", "e", "d", "fi", "fn", "si", "sn", "p"};
-    char* discribe[] = {"退回上一级", "帮助（打印此菜单）", "展示所有成绩记录", "添加成绩记录", "编辑成绩记录", "删除成绩记录", "查找学号（完全匹配）", "查找姓名（完全匹配）", "搜索学号（模糊搜索）", "搜索姓名（模糊搜索）", "管理素质类项目"};
+    char* commandList[] = {"quit", "help", "show", "add", "edit", "delete", "findID", "findname", "searchID", "searchname", "projectMgr", "sort"};
+    char* commandAbbrList[] = {"q", "h", "s", "a", "e", "d", "fi", "fn", "si", "sn", "p", "so"};
+    char* discribe[] = {"退回上一级", "帮助（打印此菜单）", "展示所有成绩记录", "添加成绩记录", "编辑成绩记录", "删除成绩记录", "查找学号（完全匹配）", "查找姓名（完全匹配）", "搜索学号（模糊搜索）", "搜索姓名（模糊搜索）", "管理素质类项目", "排序"};
     size_t commandCount = sizeof(commandList) / sizeof(commandList[0]);
     Menu(commandList, commandAbbrList, discribe, commandCount);
 
@@ -308,24 +317,21 @@ int processGradeTable(char* tableName)
             break;
         case 2:
             void** it;
-            printf("%-10s\t%-15s\t", "学号", "姓名");
-            for (size_t i = 2; i < db.columnCount; i++)
+            for (size_t i = 0; i < db.columnCount; i++)
             {
-                printf("%-9s\t", db.columnNames[i]);
+                printf("%-12s\t", db.columnNames[i]);
             }
-            printf("%-15s\t%-15s\t素质类项目数量\n", "总分", "平均");
+            printf("素质类项目数量\n");
             EDB_ITER(db, it)
             {
-                size_t projectCount;
                 edbWhere(&dbPo, "学号", it[0], NULL, 0, &projectCount);
                 double sum = 0;
-                printf("%-10s\t%-15s\t", Text(it[0]), Text(it[1]));
+                printf("%-12s\t%-12s\t", Text(it[0]), Text(it[1]));
                 for (size_t i = 2; i < db.columnCount; i++)
                 {
                     printf("%-9.2lf\t", Real(it[i]));
-                    sum += Real(it[i]);
                 }
-                printf("%-9.2lf\t%-9.2lf\t%lld\n", sum, sum / (db.columnCount - 2), projectCount);
+                printf("%lld\n", projectCount);
             }
             break;
         case 3:
@@ -333,12 +339,16 @@ int processGradeTable(char* tableName)
             mfgets(Text(newRow[0]), ID_MAX_SIZE, stdin);
             printf("姓名：");
             mfgets(Text(newRow[1]), ID_MAX_SIZE, stdin);
-            for (size_t i = 2; i < db.columnCount; i++)
+            sum = 0;
+            for (size_t i = 2; i < db.columnCount - 2; i++)
             {
                 printf("%s：", db.columnNames[i]);
                 scanf("%lf", &Real(newRow[i]));
+                sum += Real(newRow[i]);
             }
             getchar();
+            Real(newRow[db.columnCount - 2]) = sum;     //总分
+            Real(newRow[db.columnCount - 1]) = sum / (db.columnCount - 4); //平均分
             retval = edbInsert(&db, newRow);
             if (retval == SUCCESS)
             {
@@ -357,6 +367,10 @@ int processGradeTable(char* tableName)
             {
                 printf("没有这一列！\n");
                 break;
+            }
+            else if (colIndex >= db.columnCount - 2)
+            {
+                printf("只能修改单科分数！");
             }
             
             printf("学号：");
@@ -378,6 +392,20 @@ int processGradeTable(char* tableName)
             }
             
             retval = edbUpdate(&db, tmpID, tmpColName, newRow[colIndex]);
+
+            if (db.dataTypes[colIndex] == EDB_TYPE_REAL && retval == SUCCESS) //刷新总分和平均分
+            {
+                edbWhere(&db, "学号", tmpID, searchResults, 1, &resultsCount);
+                sum = 0;
+                for (size_t i = 2; i < db.columnCount - 2; i++)
+                {
+                    sum += Real(searchResults[0][i]);
+                }
+                Real(newRow[db.columnCount - 2]) = sum;
+                Real(newRow[db.columnCount - 1]) = sum / (db.columnCount - 4);
+                edbUpdate(&db, tmpID, "总分", newRow[db.columnCount - 2]);
+                edbUpdate(&db, tmpID, "平均", newRow[db.columnCount - 1]);
+            }
 
             if (retval == SUCCESS)
             {
@@ -411,21 +439,21 @@ int processGradeTable(char* tableName)
             edbWhere(&db, "学号", tmpID, searchResults, 1, &resultsCount);
             if (resultsCount > 0)
             {
-                printf("%-10s\t%-15s\t", "学号", "姓名");
-                for (size_t i = 2; i < db.columnCount; i++)
+                for (size_t j = 0; j < db.columnCount; j++)
                 {
-                    printf("%-9s\t", db.columnNames[i]);
+                    printf("%-12s\t", db.columnNames[j]);
                 }
-                printf("%-15s\t%-15s\t素质类项目数量\n", "总分", "平均");
-                int projectCount = edbWhere(&dbPo, "学号", searchResults[0][0], NULL, 0, NULL);
-                double sum = 0;
-                printf("%-10s\t%-15s\t", Text(searchResults[0][0]), Text(searchResults[0][1]));
-                for (size_t i = 2; i < db.columnCount; i++)
+                printf("素质类项目数量\n");
+                for (size_t i = 0; i < resultsCount; i++)
                 {
-                    printf("%-9.2lf\t", Real(searchResults[0][i]));
-                    sum += Real(searchResults[0][i]);
+                    edbWhere(&dbPo, "学号", it[0], NULL, 0, &projectCount);
+                    printf("%-12s\t%-12s\t", Text(searchResults[i][0]), Text(searchResults[i][1]));
+                    for (size_t j = 2; j < db.columnCount; j++)
+                    {
+                        printf("%-9.2lf\t", Real(searchResults[i][j]));
+                    }
+                    printf("%d\n", projectCount);
                 }
-                printf("%-9.2lf\t%-9.2lf\t%d\n", sum, sum / (db.columnCount - 2), projectCount);
             }
             else
             {
@@ -438,23 +466,20 @@ int processGradeTable(char* tableName)
             edbWhere(&db, "姓名", newRow[1], searchResults, 100, &resultsCount);
             if (resultsCount > 0)
             {
-                printf("%-10s\t%-15s\t", "学号", "姓名");
-                for (size_t j = 2; j < db.columnCount; j++)
+                for (size_t j = 0; j < db.columnCount; j++)
                 {
-                    printf("%-9s\t", db.columnNames[j]);
+                    printf("%-12s\t", db.columnNames[j]);
                 }
-                printf("%-15s\t%-15s\t素质类项目数量\n", "总分", "平均");
+                printf("素质类项目数量\n");
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    int projectCount = edbWhere(&dbPo, "学号", searchResults[i][0], NULL, 0, NULL);
-                    double sum = 0;
-                    printf("%-10s\t%-15s\t", Text(searchResults[i][0]), Text(searchResults[i][1]));
+                    edbWhere(&dbPo, "学号", it[0], NULL, 0, &projectCount);
+                    printf("%-12s\t%-12s\t", Text(searchResults[i][0]), Text(searchResults[i][1]));
                     for (size_t j = 2; j < db.columnCount; j++)
                     {
                         printf("%-9.2lf\t", Real(searchResults[i][j]));
-                        sum += Real(searchResults[i][j]);
                     }
-                    printf("%-9.2lf\t%-9.2lf\t%d\n", sum, sum / (db.columnCount - 2), projectCount);
+                    printf("%d\n", projectCount);
                 }
             }
             else
@@ -468,23 +493,20 @@ int processGradeTable(char* tableName)
             edbSearch(&db, "学号", newRow[0], searchResults, 100, &resultsCount);
             if (resultsCount > 0)
             {
-                printf("%-10s\t%-15s\t", "学号", "姓名");
-                for (size_t j = 2; j < db.columnCount; j++)
+                for (size_t j = 0; j < db.columnCount; j++)
                 {
-                    printf("%-9s\t", db.columnNames[j]);
+                    printf("%-12s\t", db.columnNames[j]);
                 }
-                    printf("%-15s\t%-15s\t素质类项目数量\n", "总分", "平均");
+                printf("素质类项目数量\n");
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    int projectCount = edbWhere(&dbPo, "学号", searchResults[i][0], NULL, 0, NULL);
-                    double sum = 0;
-                    printf("%-10s\t%-15s\t", Text(searchResults[i][0]), Text(searchResults[i][1]));
+                    edbWhere(&dbPo, "学号", it[0], NULL, 0, &projectCount);
+                    printf("%-12s\t%-12s\t", Text(searchResults[i][0]), Text(searchResults[i][1]));
                     for (size_t j = 2; j < db.columnCount; j++)
                     {
                         printf("%-9.2lf\t", Real(searchResults[i][j]));
-                        sum += Real(searchResults[i][j]);
                     }
-                    printf("%-9.2lf\t%-9.2lf\t%d\n", sum, sum / (db.columnCount - 2), projectCount);
+                    printf("%d\n", projectCount);
                 }
             }
             else
@@ -498,23 +520,20 @@ int processGradeTable(char* tableName)
             edbSearch(&db, "姓名", newRow[1], searchResults, 100, &resultsCount);
             if (resultsCount > 0)
             {
-                printf("%-10s\t%-15s\t", "学号", "姓名");
-                for (size_t j = 2; j < db.columnCount; j++)
+                for (size_t j = 0; j < db.columnCount; j++)
                 {
-                    printf("%-9s\t", db.columnNames[j]);
+                    printf("%-12s\t", db.columnNames[j]);
                 }
-                printf("%-15s\t%-15s\t素质类项目数量\n", "总分", "平均");
+                printf("素质类项目数量\n");
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    int projectCount = edbWhere(&dbPo, "学号", searchResults[i][0], NULL, 0, NULL);
-                    double sum = 0;
-                    printf("%-10s\t%-15s\t", Text(searchResults[i][0]), Text(searchResults[i][1]));
+                    edbWhere(&dbPo, "学号", it[0], NULL, 0, &projectCount);
+                    printf("%-12s\t%-12s\t", Text(searchResults[i][0]), Text(searchResults[i][1]));
                     for (size_t j = 2; j < db.columnCount; j++)
                     {
                         printf("%-9.2lf\t", Real(searchResults[i][j]));
-                        sum += Real(searchResults[i][j]);
                     }
-                    printf("%-9.2lf\t%-9.2lf\t%d\n", sum, sum / (db.columnCount - 2), projectCount);
+                    printf("%d\n", projectCount);
                 }
             }
             else
@@ -533,6 +552,33 @@ int processGradeTable(char* tableName)
             else
             {
                 printf("没有找到学号对应的学生！\n");
+            }
+            break;
+        case 11:
+            printf("列名：");
+            mfgets(buf, 1024, stdin);
+            switch (db.dataTypes[columnNameToColumnIndex(&db, buf)])
+            {
+            case EDB_TYPE_REAL:
+                retval = edbSort(&db, buf, cmpDoubles);
+                break;
+            case EDB_TYPE_TEXT:
+                retval = edbSort(&db, buf, NULL);
+                break;
+            case EDB_TYPE_INT:
+                retval = edbSort(&db, buf, NULL);
+                break;
+            default:
+                retval = COLUMN_NOT_FOUND;
+                break;
+            }
+            if (retval == SUCCESS)
+            {
+                printf("排序成功！\n");
+            }
+            else if (retval == COLUMN_NOT_FOUND)
+            {
+                printf("没有这一列！\n");
             }
             break;
         default:
@@ -589,7 +635,7 @@ int main(int argc, char const *argv[])
                 printf("科目数必须大于0！\n");
                 break;
             }
-            colCount += 2;
+            colCount += 4;
 
             char** colNames = (char**)malloc(colCount * sizeof(char*));
             for (size_t i = 0; i < colCount; i++)
@@ -599,11 +645,13 @@ int main(int argc, char const *argv[])
             strcpy(colNames[0], "学号");
             strcpy(colNames[1], "姓名");
             printf("逐个输入科目名称（输入每个科目名称后回车）\n");
-            for (size_t i = 2; i < colCount; i++)
+            for (size_t i = 2; i < colCount - 2; i++)
             {
                 printf("请输入第%d个科目名：", i - 1);
                 mfgets(colNames[i], COLNAME_MAX_SIZE, stdin);
             }
+            strcpy(colNames[colCount - 2], "总分");
+            strcpy(colNames[colCount - 1], "平均");
 
             size_t* dataTypes = (size_t*)malloc(colCount * sizeof(size_t));
             dataTypes[0] = EDB_TYPE_TEXT;

@@ -588,6 +588,97 @@ int edbDeleteByKey(EasyDB *db, char* columnName, void* inKey)
     return SUCCESS;
 }
 
+void swapNode(EDBRow* a, EDBRow* b)
+{
+    if (a->next == b && b->prev == a)
+    {
+        EDBRow *pre_a = a->prev;
+        EDBRow *next_b = b->next;
+
+        pre_a->next = b;
+        b->prev = pre_a;
+        b->next = a;
+        a->prev = b;
+        a->next = next_b;
+        next_b->prev = a;
+    }
+    else
+    {
+        EDBRow *pre_a = a->prev;
+        EDBRow *pre_b = b->prev;
+        EDBRow *next_a = a->next;
+        EDBRow *next_b = b->next;
+
+        pre_a->next = b;
+        b->prev = pre_a;
+        pre_b->next = a;
+        a->prev = pre_b;
+
+        a->next = next_b;
+        next_b->prev = a;
+        b->next = next_a;
+        next_a->prev = b;
+    }
+}
+
+int edbDefaultCompareInts(const void *a, const void *b){return *(int*)a - *(int*)b;}
+int edbDefaultCompareDoubles(const void *a, const void *b)
+{
+    if (*(double*)a - *(double*)b < 0) return -1;
+    else if (*(double*)a - *(double*)b > 0) return 1;
+    return 0;
+}
+
+int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const void*))
+{
+    if (db == NULL || columnName == NULL)
+    {
+        return NULL_PTR_ERROR;
+    }
+    if (db->rowCount == 0)
+    {
+        return EMPTY_TABLE;
+    }
+    int retval;
+    long long colIndex = columnNameToColumnIndex(db, columnName);
+    bool exitFlag = 0;
+    if (colIndex < 0)
+    {
+        return colIndex;
+    }
+    if (compareFunc == NULL)
+    {
+        switch (db->dataTypes[colIndex])
+        {
+        case EDB_TYPE_INT:
+            compareFunc = edbDefaultCompareInts;
+            break;
+        case EDB_TYPE_REAL:
+            compareFunc = edbDefaultCompareDoubles;
+            break;
+        case EDB_TYPE_TEXT:
+            compareFunc = (int(*)(const void *, const void *))strcmp;
+        default:
+            break;
+        }
+    }
+    
+    while (!exitFlag)
+    {
+        exitFlag = 1;
+        for (EDBRow* ptr = db->head->next; (ptr->next != db->tail && ptr->next != NULL); ptr = ptr->next)
+        {
+            EDBRow* ptrn = ptr->next;
+            retval = compareFunc(ptr->data[colIndex], ptrn->data[colIndex]);
+            if (retval > 0)
+            {
+                swapNode(ptr, ptrn);
+                exitFlag = 0;
+            }
+        }
+    }
+    return SUCCESS;
+}
 
 char* uuid(char *UUID) 
 {

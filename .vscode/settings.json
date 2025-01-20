@@ -9,6 +9,7 @@
         "time.h": "c",
         "pthread_time.h": "c",
         "index.h": "c",
-        "windows.h": "c"
+        "windows.h": "c",
+        "uthash.h": "c"
     }
 }

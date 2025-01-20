@@ -6,6 +6,18 @@
 #define BUF_SIZE 50
 #define NAME_SIZE 30
 
+int cmpInts(const void *a, const void *b)
+{
+    return *(int*)a - *(int*)b;
+}
+
+int cmpDoubles(const void *a, const void *b)
+{
+    if (*(double*)a - *(double*)b < 0) return -1;
+    else if (*(double*)a - *(double*)b > 0) return 1;
+    return 0;
+}
+
 int main(int argc, char const *argv[])
 {
     SetConsoleCP(65001);
@@ -56,7 +68,7 @@ int main(int argc, char const *argv[])
             printf("%s\t\t%s\t\t%s\n", db.columnNames[0], db.columnNames[1], db.columnNames[2]);
             for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))      //遍历打印测试数据
             {
-                printf("%d\t%-15s\t%lf\n", Int(it[0]), it[1], Real(it[2]));
+                printf("%-10d\t%-15s\t%lf\n", Int(it[0]), it[1], Real(it[2]));
             }
             printf("\n");
         }
@@ -90,7 +102,7 @@ int main(int argc, char const *argv[])
             }
             for (size_t i = 0; i < resultsCount; i++)
             {
-                printf("%d\t%-15s\t%lf\n", Int(findResults[i][0]), findResults[i][1], Real(findResults[i][2]));
+                printf("%-10d\t%-15s\t%lf\n", Int(findResults[i][0]), findResults[i][1], Real(findResults[i][2]));
             }
         }
         else if (!strcmp(command, "delete"))
@@ -146,7 +158,7 @@ int main(int argc, char const *argv[])
             {
                 for (size_t i = 0; i < resultsCount; i++)
                 {
-                    printf("%d\t%-15s\t%lf\n", Int(findResults[i][0]), findResults[i][1], Real(findResults[i][2]));
+                    printf("%-10d\t%-15s\t%lf\n", Int(findResults[i][0]), findResults[i][1], Real(findResults[i][2]));
                 }
             }
         }
@@ -196,7 +208,26 @@ int main(int argc, char const *argv[])
                 printf("%lf\n", Real(res));
             }
         }
-        
+        else if (!strcmp(command, "sort"))
+        {
+            scanf("%s", buf);
+            if (db.dataTypes[columnNameToColumnIndex(&db, buf)] == EDB_TYPE_INT)
+            {
+                retval = edbSort(&db, buf, cmpInts);
+            }
+            else if (db.dataTypes[columnNameToColumnIndex(&db, buf)] == EDB_TYPE_REAL)
+            {
+                retval = edbSort(&db, buf, cmpDoubles);
+            }
+            else if (db.dataTypes[columnNameToColumnIndex(&db, buf)] == EDB_TYPE_TEXT)
+            {
+                retval = edbSort(&db, buf, (int(*)(const void*, const void*))strcmp);
+            }
+            if (retval == SUCCESS)
+            {
+                printf("OK!\n");
+            }
+        }
         else if (!strcmp(command, "quit"))
         {
             edbClose(&db);
