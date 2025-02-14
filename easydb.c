@@ -74,7 +74,7 @@ int edbOpen(const char* filename, EasyDB* db)
     FILE* dbfile = fopen(db->dbfilename, "rb+");
     if (dbfile == NULL)
     {
-        free(db->dbfilename);
+        free(db->dbfilename); db->dbfilename = NULL;
         return FILE_OPEN_ERROR;
     }
 
@@ -82,7 +82,7 @@ int edbOpen(const char* filename, EasyDB* db)
     fread(&readMagicNum, 4, 1, dbfile);
     if (readMagicNum != EDB_MAGIC_NUMBER)
     {
-        free(db->dbfilename);
+        free(db->dbfilename); db->dbfilename = NULL;
         return MAGIC_NUMBER_ERROR;
     }
 
@@ -212,26 +212,17 @@ int edbOpen(const char* filename, EasyDB* db)
     return SUCCESS;
 }
 
-int edbClose(EasyDB *db)
+int edbCloseNotSave(EasyDB *db)
 {
     if (db == NULL) return NULL_PTR_ERROR;
     
-    char fileHead[db->dataFileOffset];
-    FILE* dbfileReadHead = fopen(db->dbfilename, "rb+");
-    fread(fileHead, 1, db->dataFileOffset, dbfileReadHead);
-    *(size_t*)&fileHead[4 + 4] = db->rowCount;
-    fclose(dbfileReadHead);
-
-    FILE* dbfile = fopen(db->dbfilename, "wb+");
-    fwrite(fileHead, 1, db->dataFileOffset, dbfile);
     EDBRow* ptr = db->head->next;
     EDBRow* pre = db->head->next;
-    free(db->head);
+    free(db->head); db->head = NULL;
     for (size_t i = 0; i < db->rowCount && ptr != db->tail; i++)
     {
         for (size_t j = 0; j < db->columnCount; j++)
         {
-            fwrite(ptr->data[j], 1, db->dataSizes[j], dbfile);
             free(ptr->data[j]);
         }
         free(ptr->data);
@@ -247,17 +238,57 @@ int edbClose(EasyDB *db)
     }
     
     for (size_t i = 0; i < db->columnCount; i++) free(db->columnNames[i]);
-    free(db->columnNames);
-    free(db->dataTypes);
-    free(db->dataOffset);
-    free(db->dataSizes);
-    free(db->indexheads);
-    free(db->dbfilename);
+    free(db->columnNames); db->columnNames = NULL;
+    free(db->dataTypes); db->dataTypes = NULL;
+    free(db->dataOffset); db->dataOffset = NULL;
+    free(db->dataSizes); db->dataSizes = NULL;
+    free(db->indexheads); db->indexheads = NULL;
+    free(db->dbfilename); db->dbfilename = NULL;
     if (db->version >= 1)
     {
-        free(db->tableName);
+        free(db->tableName); db->tableName = NULL;
     }
-    fclose(dbfile);
+    return SUCCESS;
+}
+
+int edbClose(EasyDB *db)
+{
+    if (db == NULL) return NULL_PTR_ERROR;
+    
+    edbSave(db);
+    
+    EDBRow* ptr = db->head->next;
+    EDBRow* pre = db->head->next;
+    free(db->head); db->head = NULL;
+    for (size_t i = 0; i < db->rowCount && ptr != db->tail; i++)
+    {
+        for (size_t j = 0; j < db->columnCount; j++)
+        {
+            free(ptr->data[j]);
+        }
+        free(ptr->data);
+        ptr = ptr->next;
+        free(pre);
+        pre = ptr;
+    }
+    free(ptr);
+
+    for (size_t i = 0; i < db->columnCount; i++)
+    {
+        IndexClear(&db->indexheads[i]);
+    }
+    
+    for (size_t i = 0; i < db->columnCount; i++) free(db->columnNames[i]);
+    free(db->columnNames); db->columnNames = NULL;
+    free(db->dataTypes); db->dataTypes = NULL;
+    free(db->dataOffset); db->dataOffset = NULL;
+    free(db->dataSizes); db->dataSizes = NULL;
+    free(db->indexheads); db->indexheads = NULL;
+    free(db->dbfilename); db->dbfilename = NULL;
+    if (db->version >= 1)
+    {
+        free(db->tableName); db->tableName = NULL;
+    }
     return SUCCESS;
 }
 
@@ -417,14 +448,14 @@ int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, siz
         retval = IndexFind(&db->indexheads[columnIndex], inKey, db->dataSizes[columnIndex], (void**)findResults, maxResultNumber);
         break;
     }
-    if (findResults != NULL)
+    if (findResults)
     {
         for (size_t i = 0; i < retval; i++)
         {
             findResults[i] = ((EDBRow*)(findResults[i]))->data;
         }
     }
-    if (resultsCount != NULL)
+    if (resultsCount)
     {
         *resultsCount = retval;
     }

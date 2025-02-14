@@ -88,11 +88,13 @@ int edbDefaultCompareDoubles(const void *a, const void *b);
 /* 创建数据库文件(文件名, 表名, 列数, 主键所在的列名, 每列的数据类型的数组, 每列的数据大小的数组（仅TEXT和BLOB类型需要，别的列为0即可）, 每列的列名数组) */
 int edbCreate(const char* filename, const char* tableName, size_t columnCount, char* primaryKeyColumnName, size_t dataTypes[], size_t dataSizes[], char* columnNames[]);   //创建数据库
 /* 打开数据库(文件名, &EasyDB结构体类型变量) */
-int edbOpen(const char* filename, EasyDB* db);                                                                                                      //打开数据库
+int edbOpen(const char* filename, EasyDB* db);          //打开数据库
 /* 关闭数据库(&EasyDB结构体类型变量) */
-int edbClose(EasyDB *db);                                                                                                                           //关闭数据库
+int edbClose(EasyDB *db);                               //关闭数据库
+/* 关闭数据库而不保存(&EasyDB结构体类型变量) */
+int edbCloseNotSave(EasyDB *db);                        //关闭数据库而不保存
 /* 保存数据库(&EasyDB结构体类型变量) */
-int edbSave(EasyDB *db);                                                                                                                            //保存数据库
+int edbSave(EasyDB *db);                                //保存数据库
 
 /* 数据库操作基础API */
 /* 插入(&EasyDB结构体类型变量, 新行) */
