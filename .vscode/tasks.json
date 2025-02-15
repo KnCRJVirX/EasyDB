@@ -38,8 +38,47 @@
                 "${file}",
                 "-lgdi32",
                 "-lcomctl32",
+                "-luxTheme",
                 "-o",
-                "${fileDirname}\\run.exe"
+                "${fileDirname}\\run.exe",
+                // "&&",
+                // "mt",
+                // "-manifest",
+                // "${fileBasenameNoExtension}.manifest",
+                // "-outputresource:run.exe"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "调试器生成的任务。"
+        },
+        {
+            "type": "cppbuild",
+            "label": "EasyDB Win32GUI Release 编译和嵌入清单文件",
+            "command": "C:\\w64devkit\\bin\\gcc.exe",
+            "args": [
+                "-static",
+                "-mwindows",
+                "easydb.c",
+                "index.c",
+                "${file}",
+                "-lgdi32",
+                "-lcomctl32",
+                "-lUxTheme",
+                "-o",
+                "${fileDirname}\\${fileBasenameNoExtension}.exe",
+                "&&",
+                "mt",
+                "-manifest",
+                "${fileBasenameNoExtension}.manifest",
+                "-outputresource:${fileBasenameNoExtension}.exe"
             ],
             "options": {
                 "cwd": "${fileDirname}"

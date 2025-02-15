@@ -1,34 +1,65 @@
+#define UNICODE
+#define _UNICODE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
+#include <winnt.h>
 #include <commdlg.h>
 #include <commctrl.h>
+#include <windowsx.h>
+#include <uxtheme.h> 
 #include "easydb.h"
+
+const char *appName = "EasyDB Explorer";
+const wchar_t* mainClassName = TEXT("MainWindow");
+const wchar_t* createDBClassName = TEXT("CreateNewDBWindow");
 
 #define DEFAULT_WIDTH 1280
 #define DEFAULT_HEIGHT 720
 
-#define OPEN_FILE_BUTTON 101    // ´ò¿ªÎÄ¼ş°´Å¥
-#define SAVE_FILE_BUTTON 102    // ±£´æÎÄ¼ş°´Å¥
-#define ADDNEW_BUTTON 103       // ±à¼­°´Å¥
-#define EDIT_BUTTON 104         // ±à¼­°´Å¥
-#define DELETE_BUTTON 105       // É¾³ı°´Å¥
-#define DB_LIST_VIEW 201        // ÏÔÊ¾Êı¾İ¿âÄÚÈİµÄÁĞ±íÕ¹Ê¾
+#define OPEN_FILE_BUTTON 101    // æ‰“å¼€æ–‡ä»¶æŒ‰é’®
+#define SAVE_FILE_BUTTON 102    // ä¿å­˜æ–‡ä»¶æŒ‰é’®
+#define ADDNEW_BUTTON 103       // ç¼–è¾‘æŒ‰é’®
+#define EDIT_BUTTON 104         // ç¼–è¾‘æŒ‰é’®
+#define DELETE_BUTTON 105       // åˆ é™¤æŒ‰é’®
+#define SEARCH_BUTTON 106       // æœç´¢æŒ‰é’®
+#define NEW_DB_BUTTON 107       // æ–°å»ºæŒ‰é’®
+#define DB_LIST_VIEW 201        // æ˜¾ç¤ºæ•°æ®åº“å†…å®¹çš„åˆ—è¡¨å±•ç¤º
+#define SEARCH_BOX 301          // æœç´¢æ¡†
+#define COLUMN_COMBOBOX 401     // åˆ—é€‰æ‹©ç»„åˆæ¡†
 
-char gbk_buffer[65536];
-char utf8_buffer[65536];
+#define M_BUF_SIZ 65536
+char gbk_buffer[M_BUF_SIZ];
+char utf8_buffer[M_BUF_SIZ];
+wchar_t utf16_buffer[M_BUF_SIZ];
 char dbfilename[1024];
+HINSTANCE global_hInstance;
 HWND hMainWindow;
 HWND hMainListView;
+HWND hSearchBox;
+HWND hColumnComboBox;
 EasyDB db;
-bool isEdited;              // ÎÄ¼şÊÇ·ñ±»±»±à¼­
-HWND* editingEditWindows;   // ´æ´¢ÕıÔÚ±à¼­µÄ±à¼­¿ò
-size_t editingItem;         // ÕıÔÚ±à¼­µÄĞĞ
-HWND* addingEditWindows;    // ´æ´¢ÕıÔÚÌí¼ÓµÄ±à¼­¿ò
-size_t addingItem;         // ÕıÔÚÌí¼ÓµÄĞĞ
+bool isEdited;              // æ–‡ä»¶æ˜¯å¦è¢«è¢«ç¼–è¾‘
+HWND* editingEditBoxes;   // å­˜å‚¨æ­£åœ¨ç¼–è¾‘çš„ç¼–è¾‘æ¡†
+size_t editingItem;         // æ­£åœ¨ç¼–è¾‘çš„è¡Œ
+HWND* addingEditBoxes;    // å­˜å‚¨æ­£åœ¨æ·»åŠ çš„ç¼–è¾‘æ¡†
+size_t addingItem;         // æ­£åœ¨æ·»åŠ çš„è¡Œ
 
-char* utf8togbk(char* utf8text, char* gbktext, size_t gbktext_size)
+wchar_t* utf8toutf16(const char* utf8text, wchar_t* utf16text, size_t utf16text_size)
+{
+    MultiByteToWideChar(CP_UTF8, 0, utf8text, -1, utf16text, utf16text_size);
+    return utf16text;
+}
+
+char* utf16toutf8(const wchar_t* utf16text, char* utf8text, size_t utf8text_size)
+{
+    WideCharToMultiByte(CP_UTF8, 0, utf16text, -1, utf8text, utf8text_size, NULL, NULL);
+    return utf8text;
+}
+
+char* utf8togbk(const char* utf8text, char* gbktext, size_t gbktext_size)
 {
     wchar_t* utf16text = (wchar_t*)calloc((strlen(utf8text) + 1) * 2, sizeof(char));
     MultiByteToWideChar(CP_UTF8, 0, utf8text, -1, utf16text, (strlen(utf8text) + 1) * 2);
@@ -37,53 +68,45 @@ char* utf8togbk(char* utf8text, char* gbktext, size_t gbktext_size)
     return gbktext;
 }
 
-char* gbktoutf8(char* gbktext, char* utf8text, size_t utf8text_size)
-{
-    wchar_t* utf16text = (wchar_t*)calloc((strlen(gbktext) + 1) * 2, sizeof(char));
-    MultiByteToWideChar(936, 0, gbktext, -1, utf16text, (strlen(gbktext) + 1) * 2);
-    WideCharToMultiByte(CP_UTF8, 0, utf16text, -1, utf8text, utf8text_size, NULL, NULL);
-    free(utf16text);
-    return utf8text;
-}
-
-void ProcessDBListView(HWND hListView)      // ½«Êı¾İ¿âÎÄ¼ş¶ÁÈ¡µ½ListView
+void ProcessDBListView(HWND hListView)      // å°†æ•°æ®åº“æ–‡ä»¶è¯»å–åˆ°ListView
 {
     if (db.dbfilename == NULL) return;
 
     LV_COLUMN lvCol;
-    lvCol.mask = LVCF_TEXT | LVCF_WIDTH;    // ĞèÒªÖ¸¶¨ÏÔÊ¾µÄ×Ö·ûºÍ¿í¶È
+    lvCol.mask = LVCF_TEXT | LVCF_WIDTH;    // éœ€è¦æŒ‡å®šæ˜¾ç¤ºçš„å­—ç¬¦å’Œå®½åº¦
     for (size_t i = 0; i < db.columnCount; i++)
     {
-        lvCol.pszText = utf8togbk(db.columnNames[i], gbk_buffer, 1024);
+        lvCol.pszText = utf8toutf16(db.columnNames[i], utf16_buffer, M_BUF_SIZ);
         lvCol.cx = 150;
         ListView_InsertColumn(hListView, i, &lvCol);
+        ComboBox_AddString(hColumnComboBox, lvCol.pszText); // åŒæ—¶å°†åˆ—åæ·»åŠ åˆ°åˆ—é€‰æ‹©æ¡†ä¸­
     }
 
     size_t cnt = 0;
     LV_ITEM lvItem;
-    lvItem.mask = LVIF_TEXT;                // ĞèÒªÖ¸¶¨ÏÔÊ¾µÄ×Ö·û
+    lvItem.mask = LVIF_TEXT;                // éœ€è¦æŒ‡å®šæ˜¾ç¤ºçš„å­—ç¬¦
     for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))
     {
         lvItem.iItem = cnt++;
         for (size_t i = 0; i < db.columnCount; i++)
         {
             lvItem.iSubItem = i;
-            char buf[256];
+            wchar_t buf[256] = {0};
             switch (db.dataTypes[i])
             {
             case EDB_TYPE_INT:
-                sprintf(buf, "%lld", Int(it[i]));
+                swprintf(buf, sizeof(buf), L"%lld", Int(it[i]));
                 lvItem.pszText = buf;
                 break;
             case EDB_TYPE_REAL:
-                sprintf(buf, "%lf", Real(it[i]));
+                swprintf(buf, sizeof(buf), L"%lf", Real(it[i]));
                 lvItem.pszText = buf;
                 break;
             case EDB_TYPE_BLOB:
-                lvItem.pszText = "<Blob data>";
+                lvItem.pszText = TEXT("<Blob data>");
                 break;
             case EDB_TYPE_TEXT:
-                lvItem.pszText = utf8togbk(Text(it[i]), gbk_buffer, 65536);
+                lvItem.pszText = utf8toutf16(Text(it[i]), utf16_buffer, M_BUF_SIZ);
                 break;
             default:
                 break;
@@ -94,12 +117,13 @@ void ProcessDBListView(HWND hListView)      // ½«Êı¾İ¿âÎÄ¼ş¶ÁÈ¡µ½ListView
     }
 }
 
-void ClearListView(HWND hListView, size_t columnCount)  // Çå³ıListView
+void ClearListViewAndComboBox(HWND hListView, size_t columnCount)  // æ¸…é™¤ListView
 {
     ListView_DeleteAllItems(hListView);
     for (int i = 0; i < columnCount; i++)
     {
-        ListView_DeleteColumn(hListView, 0); // Ã¿´ÎÉ¾³ıµÚÒ»¸öÁĞ
+        ListView_DeleteColumn(hListView, 0); // æ¯æ¬¡åˆ é™¤ç¬¬ä¸€ä¸ªåˆ—
+        ComboBox_DeleteString(hColumnComboBox, 0);  // æ¯æ¬¡åˆ é™¤åˆ—é€‰æ‹©æ¡†ä¸­çš„ç¬¬ä¸€ä¸ªåˆ—
     }
 }
 
@@ -107,15 +131,15 @@ void OpenDBFile(HWND hListView)
 {
     if (db.dbfilename && isEdited)
     {
-        int result = MessageBox(hMainListView, "ÊÇ·ñ±£´æÎÄ¼ş²¢´ò¿ªĞÂÎÄ¼ş£¿", "´ò¿ªĞÂÎÄ¼ş", MB_YESNOCANCEL);
+        int result = MessageBox(hMainListView, TEXT("æ˜¯å¦ä¿å­˜æ–‡ä»¶å¹¶æ‰“å¼€æ–°æ–‡ä»¶ï¼Ÿ"), TEXT("æ‰“å¼€æ–°æ–‡ä»¶"), MB_YESNOCANCEL);
         if (result == IDYES)
         {
-            ClearListView(hMainListView, db.columnCount);
+            ClearListViewAndComboBox(hMainListView, db.columnCount);
             edbClose(&db);
         }
         else if (result == IDNO)
         {
-            ClearListView(hMainListView, db.columnCount);
+            ClearListViewAndComboBox(hMainListView, db.columnCount);
             edbCloseNotSave(&db);
         }
         else if (result == IDCANCEL)
@@ -125,81 +149,83 @@ void OpenDBFile(HWND hListView)
     }
     else if (db.dbfilename && !isEdited)
     {
-        ClearListView(hMainListView, db.columnCount);
+        ClearListViewAndComboBox(hMainListView, db.columnCount);
         edbCloseNotSave(&db);
     }
 
-    // ÖØÖÃĞÂÔö°´Å¥×´Ì¬
+    // é‡ç½®ç¼–è¾‘çŠ¶æ€
+    isEdited = false;
+    // é‡ç½®æ–°å¢æŒ‰é’®çŠ¶æ€
     HWND hAddNewButton = GetDlgItem(hMainWindow, ADDNEW_BUTTON);
-    SendMessage(hAddNewButton, BM_SETCHECK, BST_UNCHECKED, 0);
-    // ÖØÖÃ±à¼­°´Å¥×´Ì¬
+    SendMessageW(hAddNewButton, BM_SETCHECK, BST_UNCHECKED, 0);
+    // é‡ç½®ç¼–è¾‘æŒ‰é’®çŠ¶æ€
     HWND hEditButton = GetDlgItem(hMainWindow, EDIT_BUTTON);
-    SendMessage(hEditButton, BM_SETCHECK, BST_UNCHECKED, 0);
+    SendMessageW(hEditButton, BM_SETCHECK, BST_UNCHECKED, 0);
 
-    edbOpen(dbfilename, &db);
+    int retval = edbOpen(utf8togbk(dbfilename, gbk_buffer, M_BUF_SIZ), &db);
+    if (retval == SUCCESS)
+    {
+        // è®¾ç½®çª—å£æ ‡é¢˜ï¼Œæ˜¾ç¤ºæ‰“å¼€çš„æ–‡ä»¶å
+        char* newTitle = (char*)calloc(strlen(appName) + strlen(dbfilename) + 10, sizeof(char));
+        strcpy(newTitle, appName);
+        strcat(newTitle, "\t");
+        strcat(newTitle, dbfilename);
+        SetWindowTextW(hMainWindow, utf8toutf16(newTitle, utf16_buffer, M_BUF_SIZ));
+        free(newTitle);
+    }
+    
     ProcessDBListView(hMainListView);
 }
 
-void DeleteButtonPressed(HWND hListView)    // ´¦ÀíÉ¾³ı°´Å¥
+void DeleteButtonPressed(HWND hListView)    // å¤„ç†åˆ é™¤æŒ‰é’®
 {
-    size_t itemCount = ListView_GetItemCount(hListView); // »ñÈ¡×ÜĞĞÊı
-    LV_ITEM lvItem;
-    lvItem.mask = LVIF_STATE;   // »ñÈ¡×´Ì¬
-    lvItem.iSubItem = 0;
-    lvItem.stateMask = LVIS_STATEIMAGEMASK;
+    size_t itemCount = ListView_GetItemCount(hListView); // è·å–æ€»è¡Œæ•°
 
-    LV_ITEM getPriKey;
-    char* priKeyBuf = (char*)malloc(db.dataSizes[db.primaryKeyIndex] * 8);
-    getPriKey.iSubItem = db.primaryKeyIndex;
-    getPriKey.mask = LVIF_TEXT;
-    getPriKey.pszText = priKeyBuf;
-    getPriKey.cchTextMax = db.dataSizes[db.primaryKeyIndex] * 8;
+    wchar_t* priKeyBuf = (wchar_t*)malloc(db.dataSizes[db.primaryKeyIndex] * 8);
 
     for (size_t i = 0; i < itemCount; i++)
     {
-        lvItem.iItem = i;
-        ListView_GetItem(hListView, &lvItem);
-        int itemState = (lvItem.state & LVIS_STATEIMAGEMASK) >> 12; // »ñÈ¡¸´Ñ¡¿ò×´Ì¬Öµ
-        if (itemState == 2)
+        if (ListView_GetCheckState(hListView, i))
         {
-            getPriKey.iItem = i;
-            ListView_GetItem(hListView, &getPriKey);
+            ListView_GetItemText(hListView, i, db.primaryKeyIndex, priKeyBuf, db.dataSizes[db.primaryKeyIndex] * 8);
             switch (db.dataTypes[db.primaryKeyIndex])
             {
             case EDB_TYPE_INT:{
                 edb_int priKeyInt;
-                sscanf(priKeyBuf, "%lld", &priKeyInt);
+                swscanf(priKeyBuf, L"%lld", &priKeyInt);
                 edbDelete(&db, &priKeyInt);
                 break;
             }
             case EDB_TYPE_REAL:{
                 double priKeyReal;
-                sscanf(priKeyBuf, "%lf", &priKeyReal);
+                swscanf(priKeyBuf, L"%lf", &priKeyReal);
                 edbDelete(&db, &priKeyReal);
                 break;
             }
             case EDB_TYPE_TEXT:{
-                edbDelete(&db, gbktoutf8(priKeyBuf, utf8_buffer, 65536));
+                edbDelete(&db, utf16toutf8(priKeyBuf, utf8_buffer, M_BUF_SIZ));
                 break;
             }
             default:
                 break;
             }
             ListView_DeleteItem(hListView, i);
+            --itemCount;
+            --i;    // é¿å…ç›¸é‚»é—æ¼æƒ…å†µ
         }
     }
     free(priKeyBuf);
 }
 
-void AddNewStart_SetEdit(HWND hListView)  // ¿ªÊ¼Ìí¼Ó
+void AddNewStart_SetEdit(HWND hListView)  // å¼€å§‹æ·»åŠ 
 {
-    // ĞÂ½¨Ò»ĞĞ£¬²¢³õÊ¼»¯Îª¿Õ
+    // æ–°å»ºä¸€è¡Œï¼Œå¹¶åˆå§‹åŒ–ä¸ºç©º
     size_t itemCount = ListView_GetItemCount(hListView);
     LVITEM lvItem;
     lvItem.iItem = itemCount;
     lvItem.iSubItem = 0;
     lvItem.mask = LVIF_TEXT;
-    char* empty = "";
+    wchar_t* empty = TEXT("");
     lvItem.pszText = empty;
     ListView_InsertItem(hListView, &lvItem);
     for (size_t i = 0; i < db.columnCount; i++)
@@ -211,29 +237,29 @@ void AddNewStart_SetEdit(HWND hListView)  // ¿ªÊ¼Ìí¼Ó
     size_t selectedItem = itemCount;
     addingItem = selectedItem;
 
-    RECT rect;  // ´æ·ÅÃ¿¸öÏîµÄÎ»ÖÃÇøÓòĞÅÏ¢£¬ÓÃÓÚ´´½¨ÎÄ±¾¿ò
-    addingEditWindows = (HWND*)malloc(db.columnCount * sizeof(HWND));   // ·ÖÅä¿Õ¼äÓÃÓÚ´æ´¢ÎÄ±¾¿ò¾ä±ú
+    RECT rect;  // å­˜æ”¾æ¯ä¸ªé¡¹çš„ä½ç½®åŒºåŸŸä¿¡æ¯ï¼Œç”¨äºåˆ›å»ºæ–‡æœ¬æ¡†
+    addingEditBoxes = (HWND*)malloc(db.columnCount * sizeof(HWND));   // åˆ†é…ç©ºé—´ç”¨äºå­˜å‚¨æ–‡æœ¬æ¡†å¥æŸ„
 
-    // »ñÈ¡´°¿ÚÄ¬ÈÏ×ÖÌå£¬ºóĞøÉèÖÃ×ÖÌåÎªÏàÍ¬£¬±ÜÃâ°´¼ü×ÖÌåÆæ¹Ö
-    HFONT hFont = (HFONT)SendMessage(hMainListView, WM_GETFONT, 0, 0);
+    // è·å–çª—å£é»˜è®¤å­—ä½“ï¼Œåç»­è®¾ç½®å­—ä½“ä¸ºç›¸åŒï¼Œé¿å…æŒ‰é”®å­—ä½“å¥‡æ€ª
+    HFONT hFont = (HFONT)SendMessageW(hMainListView, WM_GETFONT, 0, 0);
     if (hFont == NULL) {
         hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
     }
 
     for (size_t i = 0; i < db.columnCount; i++)
     {
-        if (i == 0) // ÓÉÓÚ¼æÈİĞÔ¿¼ÂÇ£¬»ñÈ¡µÚÒ»¸ö×ÓÏîµÄ¾ØĞÎÇøÓòÊ±ĞèÒªÊ¹ÓÃLVIR_LABEL
+        if (i == 0) // ç”±äºå…¼å®¹æ€§è€ƒè™‘ï¼Œè·å–ç¬¬ä¸€ä¸ªå­é¡¹çš„çŸ©å½¢åŒºåŸŸæ—¶éœ€è¦ä½¿ç”¨LVIR_LABEL
         {
-            ListView_GetSubItemRect(hListView, selectedItem, i, LVIR_LABEL, &rect);    // »ñÈ¡µÚÒ»¸ö×ÓÏîµÄ¾ØĞÎÇøÓò
+            ListView_GetSubItemRect(hListView, selectedItem, i, LVIR_LABEL, &rect);    // è·å–ç¬¬ä¸€ä¸ªå­é¡¹çš„çŸ©å½¢åŒºåŸŸ
         }
         else
         {
-            ListView_GetSubItemRect(hListView, selectedItem, i, LVIR_BOUNDS, &rect);    // »ñÈ¡×ÓÏîµÄ¾ØĞÎÇøÓò
+            ListView_GetSubItemRect(hListView, selectedItem, i, LVIR_BOUNDS, &rect);    // è·å–å­é¡¹çš„çŸ©å½¢åŒºåŸŸ
         }
-        // MapWindowPoints(hListView, GetParent(hListView), (LPPOINT)&rect, 2);        // ½«»ñÈ¡µ½µÄ×ø±êÓ³ÉäÎª¸¸´°¿ÚµÄ×ø±êÏµ
-        addingEditWindows[i] = CreateWindowEx(WS_EX_CLIENTEDGE,
+        // MapWindowPoints(hListView, GetParent(hListView), (LPPOINT)&rect, 2);        // å°†è·å–åˆ°çš„åæ ‡æ˜ å°„ä¸ºçˆ¶çª—å£çš„åæ ‡ç³»
+        addingEditBoxes[i] = CreateWindowExW(WS_EX_CLIENTEDGE,
                                                 WC_EDIT,
-                                                "",
+                                                TEXT(""),
                                                 WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
                                                 rect.left,
                                                 rect.top,
@@ -244,88 +270,101 @@ void AddNewStart_SetEdit(HWND hListView)  // ¿ªÊ¼Ìí¼Ó
                                                 GetModuleHandle(NULL),
                                                 NULL);
         
-        // ÉèÖÃ×ÖÌå
-        SendMessage(addingEditWindows[i], WM_SETFONT, (WPARAM)hFont, TRUE);
-        // ÉèÖÃ±à¼­¿òµÄ Z Ë³Ğò È·±£±à¼­¿òÎ»ÓÚ ListView µÄÉÏ·½£¬±ÜÃâ±» ListView ¸²¸Ç¡£
-        // SetWindowPos(addingEditWindows[i], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        // è®¾ç½®å­—ä½“
+        SendMessageW(addingEditBoxes[i], WM_SETFONT, (WPARAM)hFont, TRUE);
+        // è®¾ç½®ç¼–è¾‘æ¡†çš„ Z é¡ºåº ç¡®ä¿ç¼–è¾‘æ¡†ä½äº ListView çš„ä¸Šæ–¹ï¼Œé¿å…è¢« ListView è¦†ç›–ã€‚
+        // SetWindowPos(addingEditBoxes[i], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     }
 }
 
-void AddNewOver_ReadEdit(HWND hListView)  // ½áÊøÌí¼Ó
+void AddNewOver_ReadEdit(HWND hListView)  // ç»“æŸæ·»åŠ 
 {
-    // ³õÊ¼»¯ĞÂĞĞ
+    // åˆå§‹åŒ–æ–°è¡Œ
     void** newRow = (void**)malloc(db.columnCount * sizeof(void*));
     for (size_t i = 0; i < db.columnCount; i++)
     {
-        newRow[i] = (void*)malloc(db.dataSizes[i]);
+        newRow[i] = (void*)calloc(db.dataSizes[i], 1);
     }
     
-    for (size_t i = 0; i < db.columnCount; i++) // ÖğÁĞ´¦Àí
+    for (size_t i = 0; i < db.columnCount; i++) // é€åˆ—å¤„ç†
     {
-        char* readBuf = (char*)malloc(db.dataSizes[i] * 4);
+        wchar_t* readBuf = (wchar_t*)calloc(db.dataSizes[i] * 2, sizeof(wchar_t));
         edb_int readInt;
         edb_real readReal;
-        GetWindowText(addingEditWindows[i], readBuf, db.dataSizes[i] * 4); // ¶ÁÈ¡±à¼­¿òµÄÄÚÈİ
+        GetWindowTextW(addingEditBoxes[i], readBuf, db.dataSizes[i] * 4); // è¯»å–ç¼–è¾‘æ¡†çš„å†…å®¹
         switch (db.dataTypes[i])
         {
         case EDB_TYPE_INT:
-            sscanf(readBuf, "%lld", newRow[i]);
+            swscanf(readBuf, L"%lld", newRow[i]);
             break;
         case EDB_TYPE_REAL:
-            sscanf(readBuf, "%lf", newRow[i]);
+            swscanf(readBuf, L"%lf", newRow[i]);
             break;
         case EDB_TYPE_TEXT:
-            memcpy(newRow[i], gbktoutf8(readBuf, utf8_buffer, 65536), db.dataSizes[i]);
+            memcpy(newRow[i], utf16toutf8(readBuf, utf8_buffer, M_BUF_SIZ), db.dataSizes[i]);
             break;
         default:
             break;
         }
-        ListView_SetItemText(hListView, addingItem, i, readBuf);   // ¸üĞÂListViewÖĞµÄÄÚÈİ
-        ShowWindow(addingEditWindows[i], SW_HIDE); // Òş²Ø´°¿Ú
-        DestroyWindow(addingEditWindows[i]);       // Ïú»Ù´°¿Ú
+        ListView_SetItemText(hListView, addingItem, i, readBuf);   // æ›´æ–°ListViewä¸­çš„å†…å®¹
+        ShowWindow(addingEditBoxes[i], SW_HIDE); // éšè—çª—å£
+        DestroyWindow(addingEditBoxes[i]);       // é”€æ¯çª—å£
     }
-    edbInsert(&db, newRow); // ²åÈëĞÂĞĞ
+    int retval = edbInsert(&db, newRow); // æ’å…¥æ–°è¡Œ
 
-    // ÊÍ·ÅĞÂĞĞ
+    if (retval != SUCCESS)  // å¦‚æœæ’å…¥ä¸æˆåŠŸå°±åˆ é™¤æ‰ListViewä¸­çš„æ–°è¡Œ
+    {
+        ListView_DeleteItem(hListView, addingItem);
+    }
+    
+
+    // é‡Šæ”¾æ–°è¡Œ
     for (size_t i = 0; i < db.columnCount; i++)
     {
         free(newRow[i]);
     }
     free(newRow);
     addingItem = -1;
-    free(addingEditWindows); addingEditWindows = NULL;
+    free(addingEditBoxes); addingEditBoxes = NULL;
 }
 
-void EditStart_SetEdit(HWND hListView)  // ¿ªÊ¼±à¼­
+void EditStart_SetEdit(HWND hListView)  // å¼€å§‹ç¼–è¾‘
 {
-    // »ñÈ¡Ñ¡ÖĞµÄĞĞ
+    // è·å–é€‰ä¸­çš„è¡Œ
     size_t selectedItem = ListView_GetNextItem(hListView, -1, LVNI_SELECTED);
     editingItem = selectedItem;
+    if (selectedItem == -1)         //è‹¥æ²¡æœ‰é€‰ä¸­ï¼Œé‡ç½®æŒ‰é’®çŠ¶æ€å¹¶é€€å‡º
+    {
+        HWND hAddNewButton = GetDlgItem(hMainWindow, EDIT_BUTTON);
+        SendMessageW(hAddNewButton, BM_SETCHECK, BST_UNCHECKED, 0);
+        return;
+    }
+    
 
-    RECT rect;  // ´æ·ÅÃ¿¸öÏîµÄÎ»ÖÃÇøÓòĞÅÏ¢£¬ÓÃÓÚ´´½¨ÎÄ±¾¿ò
-    editingEditWindows = (HWND*)malloc(db.columnCount * sizeof(HWND)); // ·ÖÅä¿Õ¼äÓÃÓÚ´æ´¢ÎÄ±¾¿ò¾ä±ú
+    RECT rect;  // å­˜æ”¾æ¯ä¸ªé¡¹çš„ä½ç½®åŒºåŸŸä¿¡æ¯ï¼Œç”¨äºåˆ›å»ºæ–‡æœ¬æ¡†
+    editingEditBoxes = (HWND*)malloc(db.columnCount * sizeof(HWND)); // åˆ†é…ç©ºé—´ç”¨äºå­˜å‚¨æ–‡æœ¬æ¡†å¥æŸ„
 
-    // »ñÈ¡´°¿ÚÄ¬ÈÏ×ÖÌå£¬ºóĞøÉèÖÃ×ÖÌåÎªÏàÍ¬£¬±ÜÃâ°´¼ü×ÖÌåÆæ¹Ö
-    HFONT hFont = (HFONT)SendMessage(hMainListView, WM_GETFONT, 0, 0);
+    // è·å–çª—å£é»˜è®¤å­—ä½“ï¼Œåç»­è®¾ç½®å­—ä½“ä¸ºç›¸åŒï¼Œé¿å…æŒ‰é”®å­—ä½“å¥‡æ€ª
+    HFONT hFont = (HFONT)SendMessageW(hMainListView, WM_GETFONT, 0, 0);
     if (hFont == NULL) {
         hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
     }
 
     for (size_t i = 0; i < db.columnCount; i++)
     {
-        char* pszTextBuf = (char*)malloc(db.dataSizes[db.primaryKeyIndex] * 8);
-        if (i == 0) // ÓÉÓÚ¼æÈİĞÔ¿¼ÂÇ£¬»ñÈ¡µÚÒ»¸ö×ÓÏîµÄ¾ØĞÎÇøÓòÊ±ĞèÒªÊ¹ÓÃLVIR_LABEL
+        wchar_t* pszTextBuf = (wchar_t*)calloc(db.dataSizes[db.primaryKeyIndex] * 8, sizeof(wchar_t));
+        if (i == 0) // ç”±äºå…¼å®¹æ€§è€ƒè™‘ï¼Œè·å–ç¬¬ä¸€ä¸ªå­é¡¹çš„çŸ©å½¢åŒºåŸŸæ—¶éœ€è¦ä½¿ç”¨LVIR_LABEL
         {
-            ListView_GetSubItemRect(hListView, selectedItem, i, LVIR_LABEL, &rect);    // »ñÈ¡µÚÒ»¸ö×ÓÏîµÄ¾ØĞÎÇøÓò
+            ListView_GetSubItemRect(hListView, selectedItem, i, LVIR_LABEL, &rect);    // è·å–ç¬¬ä¸€ä¸ªå­é¡¹çš„çŸ©å½¢åŒºåŸŸ
         }
         else
         {
-            ListView_GetSubItemRect(hListView, selectedItem, i, LVIR_BOUNDS, &rect);    // »ñÈ¡×ÓÏîµÄ¾ØĞÎÇøÓò
+            ListView_GetSubItemRect(hListView, selectedItem, i, LVIR_BOUNDS, &rect);    // è·å–å­é¡¹çš„çŸ©å½¢åŒºåŸŸ
         }
-        // MapWindowPoints(hListView, GetParent(hListView), (LPPOINT)&rect, 2);        // ½«»ñÈ¡µ½µÄ×ø±êÓ³ÉäÎª¸¸´°¿ÚµÄ×ø±êÏµ
-        editingEditWindows[i] = CreateWindowEx(WS_EX_CLIENTEDGE,
+        // MapWindowPoints(hListView, GetParent(hListView), (LPPOINT)&rect, 2);        // å°†è·å–åˆ°çš„åæ ‡æ˜ å°„ä¸ºçˆ¶çª—å£çš„åæ ‡ç³»
+        editingEditBoxes[i] = CreateWindowExW(WS_EX_CLIENTEDGE,
                                                 WC_EDIT,
-                                                "",
+                                                TEXT(""),
                                                 WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
                                                 rect.left,
                                                 rect.top,
@@ -336,21 +375,21 @@ void EditStart_SetEdit(HWND hListView)  // ¿ªÊ¼±à¼­
                                                 GetModuleHandle(NULL),
                                                 NULL);
         
-        // ÉèÖÃ×ÖÌå
-        SendMessage(editingEditWindows[i], WM_SETFONT, (WPARAM)hFont, TRUE);
-        // »ñÈ¡µ±Ç°×ÓÏîÄÚÈİ
+        // è®¾ç½®å­—ä½“
+        SendMessageW(editingEditBoxes[i], WM_SETFONT, (WPARAM)hFont, TRUE);
+        // è·å–å½“å‰å­é¡¹å†…å®¹
         ListView_GetItemText(hListView, selectedItem, i, pszTextBuf, db.dataSizes[db.primaryKeyIndex] * 8);
-        // ·¢ËÍµ½±à¼­¿ò
-        SetWindowText(editingEditWindows[i], pszTextBuf);
-        // ÉèÖÃ±à¼­¿òµÄ Z Ë³Ğò È·±£±à¼­¿òÎ»ÓÚ ListView µÄÉÏ·½£¬±ÜÃâ±» ListView ¸²¸Ç¡£
+        // å‘é€åˆ°ç¼–è¾‘æ¡†
+        SetWindowTextW(editingEditBoxes[i], pszTextBuf);
+        // è®¾ç½®ç¼–è¾‘æ¡†çš„ Z é¡ºåº ç¡®ä¿ç¼–è¾‘æ¡†ä½äº ListView çš„ä¸Šæ–¹ï¼Œé¿å…è¢« ListView è¦†ç›–ã€‚
         // SetWindowPos(editingEditWindows[i], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
         free(pszTextBuf);
     }
 }
 
-void EditOver_ReadEdit(HWND hListView)  // ½áÊø±à¼­
+void EditOver_ReadEdit(HWND hListView)  // ç»“æŸç¼–è¾‘
 {
-    // »ñÈ¡Ö÷¼ü
+    // è·å–ä¸»é”®
     char* priKeyBuf;
     size_t pKBufSiz = 0;
     switch (db.dataTypes[db.primaryKeyIndex])
@@ -370,179 +409,362 @@ void EditOver_ReadEdit(HWND hListView)  // ½áÊø±à¼­
     default:
         break;
     }
-    ListView_GetItemText(hListView, editingItem, db.primaryKeyIndex, priKeyBuf, pKBufSiz);
+    ListView_GetItemText(hListView, editingItem, db.primaryKeyIndex, (wchar_t*)priKeyBuf, pKBufSiz);
     edb_int priKeyInt;
     edb_real priKeyReal;
     switch (db.dataTypes[db.primaryKeyIndex])
     {
     case EDB_TYPE_INT:
-        sscanf(priKeyBuf, "%lld", &priKeyInt);
+        swscanf((wchar_t*)priKeyBuf, L"%lld", &priKeyInt);
         memcpy(priKeyBuf, &priKeyInt, db.dataSizes[db.primaryKeyIndex]);
         break;
     case EDB_TYPE_REAL:
-        sscanf(priKeyBuf, "%lld", &priKeyReal);
+        swscanf((wchar_t*)priKeyBuf, L"%lf", &priKeyReal);
         memcpy(priKeyBuf, &priKeyReal, db.dataSizes[db.primaryKeyIndex]);
         break;
     case EDB_TYPE_TEXT:
-        memcpy(priKeyBuf, gbktoutf8(priKeyBuf, utf8_buffer, 65536), db.dataSizes[db.primaryKeyIndex]);
+        memcpy(priKeyBuf, utf16toutf8((wchar_t*)priKeyBuf, utf8_buffer, M_BUF_SIZ), db.dataSizes[db.primaryKeyIndex]);
         break;
     default:
         break;
     }
 
-    for (size_t i = 0; i < db.columnCount; i++) // ÖğÁĞ´¦Àí
+    for (size_t i = 0; i < db.columnCount; i++) // é€åˆ—å¤„ç†
     {
-        if (i == db.primaryKeyIndex)    // Ìø¹ıÖ÷¼ü
+        if (i == db.primaryKeyIndex)    // è·³è¿‡ä¸»é”®
         {
             continue;
         }
-        char* readBuf = (char*)malloc(db.dataSizes[i] * 4);
+        wchar_t* readBuf = (wchar_t*)calloc(db.dataSizes[i] * 4, sizeof(wchar_t));
         edb_int readInt;
         edb_real readReal;
-        GetWindowText(editingEditWindows[i], readBuf, db.dataSizes[i] * 4); // ¶ÁÈ¡±à¼­¿òµÄÄÚÈİ
+        GetWindowTextW(editingEditBoxes[i], readBuf, db.dataSizes[i] * 4); // è¯»å–ç¼–è¾‘æ¡†çš„å†…å®¹
         switch (db.dataTypes[i])
         {
         case EDB_TYPE_INT:
-            sscanf(readBuf, "%lld", &readInt);
+            swscanf(readBuf, L"%lld", &readInt);
             edbUpdate(&db, priKeyBuf, db.columnNames[i], &readInt);
             break;
         case EDB_TYPE_REAL:
-            sscanf(readBuf, "%lf", &readReal);
+            swscanf(readBuf, L"%lf", &readReal);
             edbUpdate(&db, priKeyBuf, db.columnNames[i], &readReal);
             break;
         case EDB_TYPE_TEXT:
-            edbUpdate(&db, priKeyBuf, db.columnNames[i], gbktoutf8(readBuf, utf8_buffer, 65535));
+            edbUpdate(&db, priKeyBuf, db.columnNames[i], utf16toutf8(readBuf, utf8_buffer, M_BUF_SIZ));
             break;
         default:
             break;
         }
-        ListView_SetItemText(hListView, editingItem, i, readBuf);   // ¸üĞÂListViewÖĞµÄÄÚÈİ
-        ShowWindow(editingEditWindows[i], SW_HIDE); // Òş²Ø´°¿Ú
-        DestroyWindow(editingEditWindows[i]);       // Ïú»Ù´°¿Ú
+        ListView_SetItemText(hListView, editingItem, i, readBuf);   // æ›´æ–°ListViewä¸­çš„å†…å®¹
+        ShowWindow(editingEditBoxes[i], SW_HIDE); // éšè—çª—å£
+        DestroyWindow(editingEditBoxes[i]);       // é”€æ¯çª—å£
     }
-    // ×¨ÃÅ´¦ÀíÖ÷¼ü
-    if (editingEditWindows)
+    // ä¸“é—¨å¤„ç†ä¸»é”®
+    if (editingEditBoxes)
     {
         size_t i = db.primaryKeyIndex;
-        char* readBuf = (char*)malloc(db.dataSizes[i] * 4);
+        wchar_t* readBuf = (wchar_t*)calloc(db.dataSizes[i] * 4, sizeof(wchar_t));
         edb_int readInt;
         edb_real readReal;
-        GetWindowText(editingEditWindows[i], readBuf, db.dataSizes[i] * 4); // ¶ÁÈ¡±à¼­¿òµÄÄÚÈİ
+        GetWindowTextW(editingEditBoxes[i], readBuf, db.dataSizes[i] * 4); // è¯»å–ç¼–è¾‘æ¡†çš„å†…å®¹
         switch (db.dataTypes[i])
         {
         case EDB_TYPE_INT:
-            sscanf(readBuf, "%lld", &readInt);
+            swscanf(readBuf, L"%lld", &readInt);
             edbUpdate(&db, priKeyBuf, db.columnNames[i], &readInt);
             break;
         case EDB_TYPE_REAL:
-            sscanf(readBuf, "%lf", &readReal);
+            swscanf(readBuf, L"%lf", &readReal);
             edbUpdate(&db, priKeyBuf, db.columnNames[i], &readReal);
             break;
         case EDB_TYPE_TEXT:
-            edbUpdate(&db, priKeyBuf, db.columnNames[i], gbktoutf8(readBuf, utf8_buffer, 65535));
+            edbUpdate(&db, priKeyBuf, db.columnNames[i], utf16toutf8(readBuf, utf8_buffer, M_BUF_SIZ));
             break;
         default:
             break;
         }
-        ListView_SetItemText(hListView, editingItem, i, readBuf);   // ¸üĞÂListViewÖĞµÄÄÚÈİ
-        ShowWindow(editingEditWindows[i], SW_HIDE); // Òş²Ø´°¿Ú
-        DestroyWindow(editingEditWindows[i]);       // Ïú»Ù´°¿Ú
+        ListView_SetItemText(hListView, editingItem, i, readBuf);   // æ›´æ–°ListViewä¸­çš„å†…å®¹
+        ShowWindow(editingEditBoxes[i], SW_HIDE); // éšè—çª—å£
+        DestroyWindow(editingEditBoxes[i]);       // é”€æ¯çª—å£
+        free(readBuf);
     }
     editingItem = -1;
-    free(editingEditWindows); editingEditWindows = NULL;
+    free(editingEditBoxes); editingEditBoxes = NULL;
     free(priKeyBuf);
 }
 
-void OpenFileDialogAndProcess(HWND hwnd) // Ñ¡ÔñÎÄ¼ş¶Ô»°¿ò
+void SearchButtonPressed(HWND hListView, HWND hInputBox)
 {
-    OPENFILENAME ofn;       // ÎÄ¼şÑ¡Ôñ¶Ô»°¿òµÄ½á¹¹Ìå
-    char szFile[260];       // ÓÃÓÚ´æ´¢Ñ¡ÔñµÄÎÄ¼şÂ·¾¶
+    int colIndex = ComboBox_GetCurSel(hColumnComboBox);     // è·å–é€‰ä¸­çš„åˆ—
+    if (colIndex == CB_ERR || colIndex >= db.columnCount)
+    {
+        return;
+    }
 
-    // ³õÊ¼»¯ OPENFILENAME ½á¹¹Ìå
+    wchar_t* keyWordBuf = (wchar_t*)calloc(db.dataSizes[colIndex], sizeof(wchar_t));
+    int retval = Edit_GetText(hInputBox, keyWordBuf, db.dataSizes[colIndex]);
+    if (retval == 0)    // å¦‚æœæœç´¢æ¡†è¾“å…¥ä¸ºç©ºï¼Œåˆ™æ˜¾ç¤ºæ‰€æœ‰å†…å®¹
+    {
+        ClearListViewAndComboBox(hListView, db.columnCount);
+        ProcessDBListView(hListView);
+        return;
+    }
+    
+    void** searchResult[1024];
+    size_t resultsCount;
+    retval = edbSearch(&db, db.columnNames[colIndex], utf16toutf8(keyWordBuf, utf8_buffer, M_BUF_SIZ), searchResult, 1024, &resultsCount);
+    if (retval == SUCCESS)
+    {
+        ListView_DeleteAllItems(hListView);
+        LVITEM lvItem = {0};
+        lvItem.mask = LVIF_TEXT;
+        for (size_t i = 0; i < resultsCount; i++)
+        {
+            lvItem.iItem = i;
+            for (size_t j = 0; j < db.columnCount; j++)
+            {
+                lvItem.iSubItem = j;
+                wchar_t buf[256] = {0};
+                switch (db.dataTypes[j])
+                {
+                case EDB_TYPE_INT:
+                    swprintf(buf, 256, L"%lld", Int(searchResult[i][j]));
+                    lvItem.pszText = buf;
+                    break;
+                case EDB_TYPE_REAL:
+                    swprintf(buf, 256, L"%lf", Real(searchResult[i][j]));
+                    lvItem.pszText = buf;
+                    break;
+                case EDB_TYPE_BLOB:
+                    lvItem.pszText = TEXT("<Blob data>");
+                    break;
+                case EDB_TYPE_TEXT:
+                    lvItem.pszText = utf8toutf16(Text(searchResult[i][j]), utf16_buffer, M_BUF_SIZ);
+                    break;
+                default:
+                    break;
+                }
+                if (j == 0)
+                {
+                    ListView_InsertItem(hListView, &lvItem);
+                }
+                else
+                {
+                    ListView_SetItemText(hListView, i, j, lvItem.pszText);
+                }
+            }
+        }
+    }
+    return;
+}
+
+LRESULT CALLBACK CreateDBWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    switch (uMsg)
+    {
+    case WM_PAINT:
+        {
+            // è·å–è®¾å¤‡ä¸Šä¸‹æ–‡
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+
+            // è®¾ç½®æ–‡æœ¬é¢œè‰²
+            SetTextColor(hdc, RGB(0, 0, 0)); // é»‘è‰²
+
+            // è®¾ç½®èƒŒæ™¯é¢œè‰²
+            SetBkMode(hdc, TRANSPARENT); // ä¸å¡«å……èƒŒæ™¯
+
+            // åœ¨çª—å£ä¸Šç»˜åˆ¶æ–‡å­—
+            TextOutW(hdc, 50, 50, TEXT("Hello, Win32!"), wcslen(TEXT("Hello, Win32!")));
+
+            // ç»“æŸç»˜åˆ¶
+            EndPaint(hwnd, &ps);
+        }
+        break;
+    case WM_DESTROY:
+        break;
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+    return 0;
+}
+
+void CreateNewDB()
+{
+    if (db.dbfilename && isEdited)
+    {
+        int result = MessageBox(hMainListView, TEXT("æ˜¯å¦ä¿å­˜æ–‡ä»¶å¹¶æ–°å»ºEasyDBæ•°æ®åº“ï¼Ÿ"), TEXT("æ–°å»º"), MB_YESNOCANCEL);
+        if (result == IDYES)
+        {
+            ClearListViewAndComboBox(hMainListView, db.columnCount);
+            edbClose(&db);
+        }
+        else if (result == IDNO)
+        {
+            ClearListViewAndComboBox(hMainListView, db.columnCount);
+            edbCloseNotSave(&db);
+        }
+        else if (result == IDCANCEL)
+        {
+            return;
+        }
+    }
+    else if (db.dbfilename && !isEdited)
+    {
+        ClearListViewAndComboBox(hMainListView, db.columnCount);
+        edbCloseNotSave(&db);
+    }
+
+    // é‡ç½®ç¼–è¾‘çŠ¶æ€
+    isEdited = false;
+    // é‡ç½®æ–°å¢æŒ‰é’®çŠ¶æ€
+    HWND hAddNewButton = GetDlgItem(hMainWindow, ADDNEW_BUTTON);
+    SendMessageW(hAddNewButton, BM_SETCHECK, BST_UNCHECKED, 0);
+    // é‡ç½®ç¼–è¾‘æŒ‰é’®çŠ¶æ€
+    HWND hEditButton = GetDlgItem(hMainWindow, EDIT_BUTTON);
+    SendMessageW(hEditButton, BM_SETCHECK, BST_UNCHECKED, 0);
+    
+    // åˆ›å»ºçª—å£
+    HWND hCreateDBWindow = CreateWindowExW(WS_EX_ACCEPTFILES | WS_EX_CLIENTEDGE,    // å¯æ‹–å…¥æ–‡ä»¶
+        createDBClassName, 
+        TEXT("æ–°å»ºæ•°æ®åº“"), 
+        WS_OVERLAPPEDWINDOW, 
+        CW_USEDEFAULT, CW_USEDEFAULT, 
+        600, 400, 
+        NULL, NULL, 
+        global_hInstance,
+        NULL);
+    
+    // æ˜¾ç¤ºçª—å£
+    ShowWindow(hCreateDBWindow, SW_SHOW);
+    UpdateWindow(hCreateDBWindow);
+}
+
+void OpenFileDialogAndProcess(HWND hwnd) // é€‰æ‹©æ–‡ä»¶å¯¹è¯æ¡†
+{
+    OPENFILENAME ofn;       // æ–‡ä»¶é€‰æ‹©å¯¹è¯æ¡†çš„ç»“æ„ä½“
+    wchar_t szFile[260];       // ç”¨äºå­˜å‚¨é€‰æ‹©çš„æ–‡ä»¶è·¯å¾„
+
+    // åˆå§‹åŒ– OPENFILENAME ç»“æ„ä½“
     ZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hwnd;
     ofn.lpstrFile = szFile;
     ofn.lpstrFile[0] = '\0';
     ofn.nMaxFile = sizeof(szFile);
-    ofn.lpstrFilter = "EasyDB File\0*.db";
+    ofn.lpstrFilter = TEXT("EasyDB File\0*.db");
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
     ofn.lpstrInitialDir = NULL;
-    ofn.lpstrTitle = "Open File";
+    ofn.lpstrTitle = TEXT("Open File");
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-    // ÏÔÊ¾ÎÄ¼şÑ¡Ôñ¶Ô»°¿ò
+    // æ˜¾ç¤ºæ–‡ä»¶é€‰æ‹©å¯¹è¯æ¡†
     if (GetOpenFileName(&ofn) == TRUE) {
-        // ÔÚÕâÀï´¦ÀíÑ¡ÖĞµÄÎÄ¼ş£¬ÀıÈç´ò¿ª¡¢¶ÁÈ¡ÄÚÈİµÈ
-        strcpy(dbfilename, ofn.lpstrFile);
+        // åœ¨è¿™é‡Œå¤„ç†é€‰ä¸­çš„æ–‡ä»¶ï¼Œä¾‹å¦‚æ‰“å¼€ã€è¯»å–å†…å®¹ç­‰
+        strcpy(dbfilename, utf16toutf8(szFile, utf8_buffer, M_BUF_SIZ));
         OpenDBFile(hMainListView);
     }
 }
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_CREATE:{
-            // »ñÈ¡´°¿ÚÄ¬ÈÏ×ÖÌå£¬ºóĞøÉèÖÃ×ÖÌåÎªÏàÍ¬£¬±ÜÃâ°´¼ü×ÖÌåÆæ¹Ö
-            HFONT hFont = (HFONT)SendMessage(hwnd, WM_GETFONT, 0, 0);
+            // è·å–çª—å£é»˜è®¤å­—ä½“ï¼Œåç»­è®¾ç½®å­—ä½“ä¸ºç›¸åŒï¼Œé¿å…æŒ‰é”®å­—ä½“å¥‡æ€ª
+            HFONT hFont = (HFONT)SendMessageW(hwnd, WM_GETFONT, 0, 0);
             if (hFont == NULL) {
                 hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
             }
             HWND hButton;
-            // ¡°´ò¿ª¡±°´Å¥
-            hButton = CreateWindowEx(0, "BUTTON", "´ò¿ª",
+            // â€œæ–°å»ºâ€æŒ‰é’®
+            hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("æ–°å»º"),
                 WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
                 10, 10, 60, 25, 
+                hwnd, (HMENU)NEW_DB_BUTTON, 
+                GetModuleHandle(NULL), NULL);
+            SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // â€œæ‰“å¼€â€æŒ‰é’®
+            hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("æ‰“å¼€"),
+                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                80, 10, 60, 25, 
                 hwnd, (HMENU)OPEN_FILE_BUTTON, 
                 GetModuleHandle(NULL), NULL);
-            SendMessage(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
-            // ¡°±£´æ¡±°´Å¥
-            hButton = CreateWindowEx(0, "BUTTON", "±£´æ",
+            SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // â€œä¿å­˜â€æŒ‰é’®
+            hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("ä¿å­˜"),
                 WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                80, 10, 60, 25, 
+                150, 10, 60, 25, 
                 hwnd, (HMENU)SAVE_FILE_BUTTON, 
                 GetModuleHandle(NULL), NULL);
-            SendMessage(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
-            // ¡°ĞÂÔö¡±°´Å¥
-            hButton = CreateWindowEx(0, "BUTTON", "ĞÂÔö",
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_CHECKBOX,
-                150, 10, 60, 25, 
-                hwnd, (HMENU)ADDNEW_BUTTON, 
-                GetModuleHandle(NULL), NULL);
-            SendMessage(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
-            // ¡°±à¼­¡±°´Å¥
-            hButton = CreateWindowEx(0, "BUTTON", "±à¼­",
+            SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // â€œæ–°å¢â€æŒ‰é’®
+            hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("æ–°å¢"),
                 WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_CHECKBOX,
                 220, 10, 60, 25, 
+                hwnd, (HMENU)ADDNEW_BUTTON, 
+                GetModuleHandle(NULL), NULL);
+            SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // â€œç¼–è¾‘â€æŒ‰é’®
+            hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("ç¼–è¾‘"),
+                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_CHECKBOX,
+                290, 10, 60, 25, 
                 hwnd, (HMENU)EDIT_BUTTON, 
                 GetModuleHandle(NULL), NULL);
-            SendMessage(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
-            // ¡°É¾³ı¡±°´Å¥
-            hButton = CreateWindowEx(0, "BUTTON", "É¾³ı",
+            SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // â€œåˆ é™¤â€æŒ‰é’®
+            hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("åˆ é™¤"),
                 WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                290, 10, 60, 25, 
+                360, 10, 60, 25, 
                 hwnd, (HMENU)DELETE_BUTTON, 
                 GetModuleHandle(NULL), NULL);
-            SendMessage(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
-            // Ô¤ÀÀÁĞ±í
-            hMainListView = CreateWindowEx(WS_EX_CLIENTEDGE,    // À©Õ¹´°¿ÚÑùÊ½£¬´ø±ß¿ò
-                    WC_LISTVIEW, "",
+            SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // åˆ—é€‰æ‹©ç»„åˆæ¡†
+            hColumnComboBox = CreateWindowExW(0, WC_COMBOBOX,
+                                                NULL,
+                                                CBS_DROPDOWN | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE,
+                                                430, 10, 100, 25,
+                                                hwnd, (HMENU)COLUMN_COMBOBOX, 
+                                                GetModuleHandle(NULL), NULL);
+            SendMessageW(hColumnComboBox, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // æœç´¢æ¡†
+            hSearchBox = CreateWindowExW(WS_EX_CLIENTEDGE, 
+                                            TEXT("EDIT"),
+                                            NULL,
+                                            WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+                                            550, 10, 300, 25,
+                                            hwnd, (HMENU)SEARCH_BOX,
+                                            GetModuleHandle(NULL), NULL);
+            SendMessageW(hSearchBox, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // â€œæœç´¢â€æŒ‰é’®
+            hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("æœç´¢"),
+                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                870, 10, 60, 25, 
+                hwnd, (HMENU)SEARCH_BUTTON, 
+                GetModuleHandle(NULL), NULL);
+            SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+            // é¢„è§ˆåˆ—è¡¨
+            hMainListView = CreateWindowExW(WS_EX_CLIENTEDGE,    // æ‰©å±•çª—å£æ ·å¼ï¼Œå¸¦è¾¹æ¡†
+                    WC_LISTVIEW, TEXT(""),
                     WS_CHILD | WS_VISIBLE | LVS_REPORT,
                     10, 50, DEFAULT_WIDTH - 30, DEFAULT_HEIGHT - 60,
                     hwnd, (HMENU)DB_LIST_VIEW,
                     GetModuleHandle(NULL), NULL);
-            // SendMessage(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);   // ÕûĞĞÑ¡ÖĞ
-            // SendMessage(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES, LVS_EX_CHECKBOXES);         // ¸´Ñ¡¿ò
+            // SendMessageW(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);   // æ•´è¡Œé€‰ä¸­
+            // SendMessageW(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES, LVS_EX_CHECKBOXES);         // å¤é€‰æ¡†
             ListView_SetExtendedListViewStyle(hMainListView, LVS_EX_FULLROWSELECT | LVS_EX_CHECKBOXES);
             break;
         }
         case WM_COMMAND:{
-            if (LOWORD(wParam) == OPEN_FILE_BUTTON)          // ¡°´ò¿ª¡±°´Å¥±»°´ÏÂ
+            if (LOWORD(wParam) == NEW_DB_BUTTON)             // â€œæ–°å»ºâ€æŒ‰é’®è¢«æŒ‰ä¸‹
+            {
+                CreateNewDB();
+            }
+            else if (LOWORD(wParam) == OPEN_FILE_BUTTON)     // â€œæ‰“å¼€â€æŒ‰é’®è¢«æŒ‰ä¸‹
             {
                 OpenFileDialogAndProcess(hwnd);
             }
-            else if (LOWORD(wParam) == SAVE_FILE_BUTTON)     // ¡°±£´æ¡±°´Å¥±»°´ÏÂ
+            else if (LOWORD(wParam) == SAVE_FILE_BUTTON)     // â€œä¿å­˜â€æŒ‰é’®è¢«æŒ‰ä¸‹
             {
                 if (db.dbfilename)
                 {
@@ -550,39 +772,39 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     edbSave(&db);
                 }
             }
-            else if (LOWORD(wParam) == ADDNEW_BUTTON)        // ¡°ĞÂÔö¡±°´Å¥±»°´ÏÂ
+            else if (LOWORD(wParam) == ADDNEW_BUTTON)        // â€œæ–°å¢â€æŒ‰é’®è¢«æŒ‰ä¸‹
             {
                 HWND hButton = (HWND)lParam;
-                if (db.dbfilename && SendMessage(hButton, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
+                if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
                 {
                     isEdited = true;
-                    SendMessage(hButton, BM_SETCHECK, BST_CHECKED, 0);
+                    SendMessageW(hButton, BM_SETCHECK, BST_CHECKED, 0);
                     AddNewStart_SetEdit(hMainListView);
                 }
-                else if (db.dbfilename && SendMessage(hButton, BM_GETCHECK, 0, 0) == BST_CHECKED)
+                else if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_CHECKED)
                 {
                     isEdited = true;
-                    SendMessage(hButton, BM_SETCHECK, BST_UNCHECKED, 0);
+                    SendMessageW(hButton, BM_SETCHECK, BST_UNCHECKED, 0);
                     AddNewOver_ReadEdit(hMainListView);
                 }
             }
-            else if (LOWORD(wParam) == EDIT_BUTTON)          // ¡°±à¼­¡±°´Å¥±»°´ÏÂ
+            else if (LOWORD(wParam) == EDIT_BUTTON)          // â€œç¼–è¾‘â€æŒ‰é’®è¢«æŒ‰ä¸‹
             {
                 HWND hButton = (HWND)lParam;
-                if (db.dbfilename && SendMessage(hButton, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
+                if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
                 {
                     isEdited = true;
-                    SendMessage(hButton, BM_SETCHECK, BST_CHECKED, 0);
+                    SendMessageW(hButton, BM_SETCHECK, BST_CHECKED, 0);
                     EditStart_SetEdit(hMainListView);
                 }
-                else if (db.dbfilename && SendMessage(hButton, BM_GETCHECK, 0, 0) == BST_CHECKED)
+                else if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_CHECKED)
                 {
                     isEdited = true;
-                    SendMessage(hButton, BM_SETCHECK, BST_UNCHECKED, 0);
+                    SendMessageW(hButton, BM_SETCHECK, BST_UNCHECKED, 0);
                     EditOver_ReadEdit(hMainListView);
                 }
             }
-            else if (LOWORD(wParam) == DELETE_BUTTON)        // ¡°É¾³ı¡±°´Å¥±»°´ÏÂ
+            else if (LOWORD(wParam) == DELETE_BUTTON)        // â€œåˆ é™¤â€æŒ‰é’®è¢«æŒ‰ä¸‹
             {
                 if (db.dbfilename)
                 {
@@ -590,34 +812,42 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     DeleteButtonPressed(hMainListView);
                 }
             }
+            else if (LOWORD(wParam) == SEARCH_BUTTON)
+            {
+                if (db.dbfilename)
+                {
+                    SearchButtonPressed(hMainListView, hSearchBox);
+                }
+            }
+            
             break;
         }
-        case WM_DROPFILES:{     // ´¦ÀíÍÏÈëÎÄ¼ş
+        case WM_DROPFILES:{     // å¤„ç†æ‹–å…¥æ–‡ä»¶
             HDROP hDrop = (HDROP)wParam;
 
-            char filePath[MAX_PATH];
+            wchar_t filePath[MAX_PATH];
             DragQueryFile(hDrop, 0, filePath, MAX_PATH);
-            strcpy(dbfilename, filePath);
+            strcpy(dbfilename, utf16toutf8(filePath, utf8_buffer, M_BUF_SIZ));
             OpenDBFile(hMainListView);
 
-            // ÊÍ·ÅÍÏ×§¾ä±ú
+            // é‡Šæ”¾æ‹–æ‹½å¥æŸ„
             DragFinish(hDrop);
             break;
         }
-        case WM_SIZE:           // ´¦ÀíÓÃ»§¸Ä±ä´°¿Ú´óĞ¡
+        case WM_SIZE:           // å¤„ç†ç”¨æˆ·æ”¹å˜çª—å£å¤§å°
         {
             int newWidth = LOWORD(lParam);
             int newHeight = HIWORD(lParam);
-            MoveWindow(hMainListView, 10, 40, newWidth - 30, newHeight - 60, TRUE);     // ĞŞ¸ÄListViewµÄ´óĞ¡
-            InvalidateRect(hwnd, NULL, TRUE);  // Ç¿ÖÆÖØ»æ´°¿Ú
+            MoveWindow(hMainListView, 10, 40, newWidth - 30, newHeight - 60, TRUE);     // ä¿®æ”¹ListViewçš„å¤§å°
+            InvalidateRect(hwnd, NULL, TRUE);  // å¼ºåˆ¶é‡ç»˜çª—å£
             break;
         }
-        case WM_PAINT:          // ´¦Àí´°¿ÚÖØ»æ
+        case WM_PAINT:          // å¤„ç†çª—å£é‡ç»˜
         {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
             
-            // Ìî³ä´°¿Ú±³¾°É«
+            // å¡«å……çª—å£èƒŒæ™¯è‰²
             FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
 
             EndPaint(hwnd, &ps);
@@ -630,7 +860,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 return 0;
             }
             
-            int result = MessageBox(hwnd, "ÊÇ·ñ±£´æÎÄ¼ş²¢ÍË³ö£¿", "ÍË³ö", MB_YESNOCANCEL);
+            int result = MessageBox(hwnd, TEXT("æ˜¯å¦ä¿å­˜æ–‡ä»¶å¹¶é€€å‡ºï¼Ÿ"), TEXT("é€€å‡º"), MB_YESNOCANCEL);
             if (result == IDYES)
             {
                 edbClose(&db);
@@ -646,39 +876,53 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             {
                 return 0;
             }
+            break;
         }
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-    // ×¢²áÖ÷´°¿ÚÀà
-    const char* mainClassName = "MainWindow";
+    global_hInstance = hInstance;
+    // æ³¨å†Œä¸»çª—å£ç±»
     WNDCLASS mainwc = {0};
-    mainwc.lpfnWndProc = WindowProc;
+    mainwc.lpfnWndProc = MainWindowProc;
     mainwc.hInstance = hInstance;
     mainwc.lpszClassName = mainClassName;
     RegisterClass(&mainwc);
 
-    // ´´½¨´°¿Ú
-    hMainWindow = CreateWindowEx(WS_EX_ACCEPTFILES,    // ¿ÉÍÏÈëÎÄ¼ş
-                                        mainClassName, 
-                                        "EasyDB Explorer", 
-                                        WS_OVERLAPPEDWINDOW, 
-                                        CW_USEDEFAULT, CW_USEDEFAULT, 
-                                        DEFAULT_WIDTH, DEFAULT_HEIGHT, 
-                                        NULL, NULL, 
-                                        mainwc.hInstance,
-                                        NULL);
+    // æ³¨å†Œæ–°å»ºæ•°æ®åº“çª—å£ç±»
+    WNDCLASS createwc = {0};
+    createwc.lpfnWndProc = CreateDBWindowProc;
+    createwc.hInstance = hInstance;
+    createwc.lpszClassName = createDBClassName;
+    RegisterClass(&createwc);
+
+    // åˆ›å»ºçª—å£
+    hMainWindow = CreateWindowExW(WS_EX_ACCEPTFILES | WS_EX_CLIENTEDGE,    // å¯æ‹–å…¥æ–‡ä»¶
+                                mainClassName, 
+                                utf8toutf16(appName, utf16_buffer, M_BUF_SIZ), 
+                                WS_OVERLAPPEDWINDOW, 
+                                CW_USEDEFAULT, CW_USEDEFAULT, 
+                                DEFAULT_WIDTH, DEFAULT_HEIGHT, 
+                                NULL, NULL, 
+                                mainwc.hInstance,
+                                NULL);
     
-    // ÏÔÊ¾´°¿Ú
+    // æ˜¾ç¤ºçª—å£
     ShowWindow(hMainWindow, SW_SHOW);
     UpdateWindow(hMainWindow);
 
-    // ³õÊ¼»¯ Common Controls ¿â
+    // åˆå§‹åŒ–å¸¸ç”¨æ§ä»¶åº“
     InitCommonControls();
 
-    // ÏûÏ¢Ñ­»·
+    // å¯ç”¨ Windows è§†è§‰æ ·å¼
+    EnableThemeDialogTexture(hMainListView, ETDT_ENABLE);
+
+    // åˆå§‹åŒ– Common Controls åº“
+    InitCommonControls();
+
+    // æ¶ˆæ¯å¾ªç¯
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);

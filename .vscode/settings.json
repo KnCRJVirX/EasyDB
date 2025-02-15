@@ -10,6 +10,7 @@
         "pthread_time.h": "c",
         "index.h": "c",
         "windows.h": "c",
-        "uthash.h": "c"
+        "uthash.h": "c",
+        "windows.foundation.h": "c"
     }
 }

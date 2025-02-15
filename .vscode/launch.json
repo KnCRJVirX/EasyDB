@@ -45,6 +45,18 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "name": "EasyDB Win32GUI Release",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "preLaunchTask": "EasyDB Win32GUI Release 编译和嵌入清单文件",
+            "program": "${fileDirname}\\${fileBasenameNoExtension}.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "console": "externalTerminal"
         }
     ]
 }

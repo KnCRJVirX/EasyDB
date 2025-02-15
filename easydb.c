@@ -248,6 +248,7 @@ int edbCloseNotSave(EasyDB *db)
     {
         free(db->tableName); db->tableName = NULL;
     }
+    memset(db, 0, sizeof(EasyDB));
     return SUCCESS;
 }
 
@@ -289,6 +290,7 @@ int edbClose(EasyDB *db)
     {
         free(db->tableName); db->tableName = NULL;
     }
+    memset(db, 0, sizeof(EasyDB));
     return SUCCESS;
 }
 

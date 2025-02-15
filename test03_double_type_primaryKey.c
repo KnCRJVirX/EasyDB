@@ -18,7 +18,7 @@ int main(int argc, char const *argv[])
     int retval = edbOpen(dbfilename, &db);
     if (retval == FILE_OPEN_ERROR)
     {
-        edbCreate(dbfilename, 3, "Balance", dataTypes, dataLenths, colNames);
+        edbCreate(dbfilename, "03_Double_Type_PrimaryKey_Test", 3, "Balance", dataTypes, dataLenths, colNames);
         edbOpen(dbfilename, &db);
     }
     
@@ -154,7 +154,7 @@ int main(int argc, char const *argv[])
         else if (!strcmp(command, "deletekw"))
         {
             scanf("%s", newName);
-            retval = edbDeleteByKeyword(&db, "Name", newName, 100);
+            retval = edbDeleteByKeyword(&db, "Name", newName);
             if (retval == SUCCESS)
             {
                 printf("OK!\n");
