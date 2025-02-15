@@ -1,15 +1,21 @@
 #include <stdio.h>
 #include <string.h>
-#include <windows.h>
 #include "easydb.h"
 #define COMMAND_SIZE 50
 #define BUF_SIZE 50
 #define NAME_SIZE 30
 
+#ifdef __WIN32
+#include <windows.h>
+#endif
+
 int main(int argc, char const *argv[])
 {
+    #ifdef __WIN32
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
+    #endif
+    
     EasyDB db;
     const char* dbfilename = "test03_double_type_primaryKey.db";
     size_t dataTypes[] = {EDB_TYPE_INT, EDB_TYPE_TEXT, EDB_TYPE_REAL};

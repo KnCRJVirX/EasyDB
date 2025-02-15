@@ -98,7 +98,7 @@ int edbOpen(const char* filename, EasyDB* db)
     db->dataSizes = (size_t*)malloc(db->columnCount * sizeof(size_t));       //读取一行中每个数据的长度
     fread(db->dataSizes, EDB_INT_SIZE, db->columnCount, dbfile);
 
-    char colNameBuf[1024];                                                  //读取列名
+    char colNameBuf[4096];                                                  //读取列名
     size_t colNameLen;
     db->columnNames = (char**)malloc(db->columnCount * sizeof(char*));
     for (size_t i = 0; i < db->columnCount; i++)
@@ -109,21 +109,21 @@ int edbOpen(const char* filename, EasyDB* db)
         {
             c = fgetc(dbfile);
             colNameBuf[colNameLen++] = c;
-        } while (c != 0 && c < 1024);
+        } while (c != 0 && c < 4096);
         db->columnNames[i] = (char*)malloc(colNameLen);
         strcpy(db->columnNames[i], colNameBuf);
     }
 
     if (db->version >= 1)
     {
-        db->tableName = (char*)malloc(1024 * sizeof(char));
+        db->tableName = (char*)malloc(4096 * sizeof(char));
         char c;
         int tableNameLen = 0;
         do
         {
             c = fgetc(dbfile);
             db->tableName[tableNameLen++] = c;
-        } while (c != 0 && tableNameLen < 1024);
+        } while (c != 0 && tableNameLen < 4096);
         
     }
 

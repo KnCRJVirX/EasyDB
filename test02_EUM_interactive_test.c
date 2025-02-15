@@ -1,11 +1,17 @@
 #include <stdio.h>
-#include <windows.h>
 #include "easydb.h"
+
+#ifdef __WIN32
+#include <windows.h>
+#endif
 
 int main(int argc, char const *argv[])
 {
+    #ifdef __WIN32
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
+    #endif
+
     const char* dbfilename = "test02_EUM_interactive_test.db";
     const char* tablename = "Test02: Easy User Management interactive test";
     size_t dataTypes[]= {EDB_TYPE_TEXT, EDB_TYPE_TEXT, EDB_TYPE_INT};

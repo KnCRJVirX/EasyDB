@@ -1,11 +1,17 @@
 #include <stdio.h>
-#include <windows.h>
 #include "easydb.h"
+
+#ifdef __WIN32
+#include <windows.h>
+#endif
 
 int main(int argc, char const *argv[])
 {
+    #ifdef __WIN32
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
+    #endif
+    
     char* dbfilename;
     if (argc < 2)
     {

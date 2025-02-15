@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <string.h>
-#include <windows.h>
 #include "easydb.h"
 #define COMMAND_SIZE 50
 #define BUF_SIZE 50
 #define NAME_SIZE 30
+
+#ifdef __WIN32
+#include <windows.h>
+#endif
 
 int cmpInts(const void *a, const void *b)
 {
@@ -20,8 +23,11 @@ int cmpDoubles(const void *a, const void *b)
 
 int main(int argc, char const *argv[])
 {
+    #ifdef __WIN32
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
+    #endif
+    
     EasyDB db;
     const char* dbfilename = "test00_interactive_test.db";
     const char* tablename = "Test00: Interactive test";
