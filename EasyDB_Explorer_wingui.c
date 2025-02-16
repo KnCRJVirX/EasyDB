@@ -204,38 +204,35 @@ void DeleteButtonPressed(HWND hListView)    // 处理删除按钮
 {
     size_t itemCount = ListView_GetItemCount(hListView); // 获取总行数
 
-    wchar_t* priKeyBuf = (wchar_t*)malloc(db.dataSizes[db.primaryKeyIndex] * 8);
+    wchar_t* priKeyBuf = (wchar_t*)calloc(db.dataSizes[db.primaryKeyIndex] * 4, sizeof(wchar_t));
 
-    for (size_t i = 0; i < itemCount; i++)
+    int selectedItem = ListView_GetNextItem(hListView, -1, LVNI_SELECTED);
+    while (selectedItem != -1)
     {
-        if (ListView_GetCheckState(hListView, i))
+        ListView_GetItemText(hListView, selectedItem, db.primaryKeyIndex, priKeyBuf, db.dataSizes[db.primaryKeyIndex] * 4);
+        switch (db.dataTypes[db.primaryKeyIndex])
         {
-            ListView_GetItemText(hListView, i, db.primaryKeyIndex, priKeyBuf, db.dataSizes[db.primaryKeyIndex] * 8);
-            switch (db.dataTypes[db.primaryKeyIndex])
-            {
-            case EDB_TYPE_INT:{
-                edb_int priKeyInt;
-                swscanf(priKeyBuf, L"%lld", &priKeyInt);
-                edbDelete(&db, &priKeyInt);
-                break;
-            }
-            case EDB_TYPE_REAL:{
-                double priKeyReal;
-                swscanf(priKeyBuf, L"%lf", &priKeyReal);
-                edbDelete(&db, &priKeyReal);
-                break;
-            }
-            case EDB_TYPE_TEXT:{
-                edbDelete(&db, utf16toutf8(priKeyBuf, utf8_buffer, M_BUF_SIZ));
-                break;
-            }
-            default:
-                break;
-            }
-            ListView_DeleteItem(hListView, i);
-            --itemCount;
-            --i;    // 避免相邻遗漏情况
+        case EDB_TYPE_INT:{
+            edb_int priKeyInt;
+            swscanf(priKeyBuf, L"%lld", &priKeyInt);
+            edbDelete(&db, &priKeyInt);
+            break;
         }
+        case EDB_TYPE_REAL:{
+            double priKeyReal;
+            swscanf(priKeyBuf, L"%lf", &priKeyReal);
+            edbDelete(&db, &priKeyReal);
+            break;
+        }
+        case EDB_TYPE_TEXT:{
+            edbDelete(&db, utf16toutf8(priKeyBuf, utf8_buffer, M_BUF_SIZ));
+            break;
+        }
+        default:
+            break;
+        }
+        ListView_DeleteItem(hListView, selectedItem);
+        selectedItem = ListView_GetNextItem(hListView, selectedItem - 1, LVNI_SELECTED);
     }
     free(priKeyBuf);
 }
@@ -834,16 +831,16 @@ LRESULT CALLBACK CreateDBWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             ListView_GetItemText(hColumnListView, selectedItem, 0, buf, 4096);
             Edit_SetText(hPrimaryKeyEditBox, buf);
         }
-        else if (LOWORD(wParam) == DELETE_COL_BUTTON)       // “删除此列”按钮被按下
+        else if (LOWORD(wParam) == DELETE_COL_BUTTON)         // “删除此列”按钮被按下
         {
             int selectedItem = ListView_GetNextItem(hColumnListView, -1, LVNI_SELECTED);
-            if (selectedItem == -1)
+            while (selectedItem != -1)
             {
-                break;
+                ListView_DeleteItem(hColumnListView, selectedItem);
+                selectedItem = ListView_GetNextItem(hColumnListView, selectedItem - 1, LVNI_SELECTED);
             }
-            ListView_DeleteItem(hColumnListView, selectedItem);
         }
-        else if (LOWORD(wParam) == CREATE_CANCEL_BUTTON)    // “取消”按钮被按下
+        else if (LOWORD(wParam) == CREATE_CANCEL_BUTTON)      // “取消”按钮被按下
         {
             ShowWindow(hwnd, SW_HIDE);
             DestroyWindow(hwnd);
@@ -950,7 +947,7 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             HWND hButton;
             // “新建”按钮
             hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("新建"),
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                 10, 10, 60, 25, 
                 hwnd, (HMENU)NEW_DB_BUTTON, 
                 GetModuleHandle(NULL), NULL);
@@ -1023,7 +1020,7 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
                     GetModuleHandle(NULL), NULL);
             // SendMessageW(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);   // 整行选中
             // SendMessageW(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES, LVS_EX_CHECKBOXES);         // 复选框
-            ListView_SetExtendedListViewStyle(hMainListView, LVS_EX_FULLROWSELECT | LVS_EX_CHECKBOXES);
+            ListView_SetExtendedListViewStyle(hMainListView, LVS_EX_FULLROWSELECT);
             break;
         }
         case WM_COMMAND:{
@@ -1160,6 +1157,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     mainwc.lpfnWndProc = MainWindowProc;
     mainwc.hInstance = hInstance;
     mainwc.lpszClassName = mainClassName;
+    mainwc.hIcon = LoadIcon(hInstance, TEXT("IDR_MAINICON"));   // 设置图标
     RegisterClass(&mainwc);
 
     // 注册新建数据库窗口类
@@ -1167,6 +1165,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     createwc.lpfnWndProc = CreateDBWindowProc;
     createwc.hInstance = hInstance;
     createwc.lpszClassName = createDBClassName;
+    createwc.hIcon = LoadIcon(hInstance, TEXT("IDR_MAINICON")); // 设置图标
     RegisterClass(&createwc);
 
     // 创建窗口
@@ -1179,6 +1178,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
                                 NULL, NULL, 
                                 mainwc.hInstance,
                                 NULL);
+
     
     // 显示窗口
     ShowWindow(hMainWindow, SW_SHOW);

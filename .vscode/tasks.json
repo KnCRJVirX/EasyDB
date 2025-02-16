@@ -66,6 +66,7 @@
             "args": [
                 "-static",
                 "-mwindows",
+                "EasyDB_icon.res",
                 "easydb.c",
                 "index.c",
                 "${file}",
@@ -74,6 +75,7 @@
                 "-lUxTheme",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
+                "-O3",
                 "&&",
                 "mt",
                 "-manifest",

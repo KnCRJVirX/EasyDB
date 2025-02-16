@@ -2,21 +2,22 @@
 
 int IndexInsert(IndexNode** head, void* inKey, size_t keyLenth, void* data)
 {
-    IndexNode* newNode = (IndexNode*)malloc(sizeof(IndexNode));
-    newNode->key = inKey;
-    newNode->keyLenth = keyLenth;
-    newNode->data = data;
-    newNode->next = NULL;
+    SetNode* newSetNode = (SetNode*)malloc(sizeof(SetNode));
+    newSetNode->data = data;
     IndexNode* findNode = NULL;
-    HASH_FIND(hh, *head, newNode->key, keyLenth, findNode);
+    HASH_FIND(hh, *head, inKey, keyLenth, findNode);
     if (findNode == NULL)
     {
-        HASH_ADD_KEYPTR(hh, *head, newNode->key, keyLenth, newNode);
+        IndexNode* newIndexNode = (IndexNode*)malloc(sizeof(IndexNode));
+        newIndexNode->key = inKey;
+        newIndexNode->keyLenth = keyLenth;
+        newIndexNode->data = NULL;
+        HASH_ADD_KEYPTR(hh, newIndexNode->data, &newSetNode->data, sizeof(void*), newSetNode);
+        HASH_ADD_KEYPTR(hh, *head, newIndexNode->key, newIndexNode->keyLenth, newIndexNode);
     }
     else
     {
-        newNode->next = findNode->next;
-        findNode->next = newNode;
+        HASH_ADD_KEYPTR(hh, findNode->data, &newSetNode->data, sizeof(void*), newSetNode);
     }
     return 0;
 }
@@ -33,14 +34,17 @@ size_t IndexFind(IndexNode** head, void* inKey, size_t keyLenth, void** findResu
     }
     else
     {
-        while (findNode != NULL && (count < len || len == 0))
+        if (findResults == NULL || len == 0)
         {
-            if (findResults != NULL)
+            return HASH_COUNT(findNode->data);
+        }
+        SetNode *ptr1 = NULL, *ptr2 = NULL;
+        HASH_ITER(hh, findNode->data, ptr1, ptr2){
+            if (findResults && count < len)
             {
-                findResults[count++] = findNode->data;
+                findResults[count] = ptr1->data;
             }
-            if (len == 0) count++;
-            findNode = findNode->next;
+            ++count;
         }
         return count;
     }
@@ -55,50 +59,35 @@ int IndexDel(IndexNode** head, void* inKey, size_t keyLenth, void* data_ptr)
     {
         return NODE_NOT_EXIST;
     }
-    else if (findNode->next == NULL)
-    {
-        HASH_DEL(*head, findNode);
-        free(findNode);
-        return 0;
-    }
     else
     {
-        if (findNode->data == data_ptr)
+        SetNode* findSetNode = NULL;
+        HASH_FIND(hh, findNode->data, &data_ptr, sizeof(data_ptr), findSetNode);
+        if (findSetNode == NULL)
         {
-            IndexNode* newNode = findNode->next;
-            HASH_DEL(*head, findNode);
-            free(findNode);
-            HASH_ADD_KEYPTR(hh, *head, newNode->key, newNode->keyLenth, newNode);
-            return 0;
+            return NODE_NOT_EXIST;
         }
-        while (findNode->next != NULL)
+        else
         {
-            if (findNode->next->data == data_ptr)
-            {
-                IndexNode* delNode = findNode->next;
-                findNode->next = findNode->next->next;
-                free(delNode);
-                return 0;
-            }
-            findNode = findNode->next;
+            HASH_DEL(findNode->data, findSetNode);
+            free(findSetNode);
         }
     }
+    
     return 0;
 }
 
 int IndexClear(IndexNode** head)
 {
     IndexNode *ptr1, *ptr2;
-    IndexNode *pre, *ptr;
     HASH_ITER(hh, *head, ptr1, ptr2){
-        HASH_DEL(*head, ptr1);
-        ptr = pre = ptr1;
-        while (ptr != NULL)
-        {
-            ptr = ptr->next;
-            free(pre);
-            pre = ptr;
+        SetNode *ptr3 = NULL, *ptr4 = NULL;
+        HASH_ITER(hh, ptr1->data, ptr3, ptr4){
+            HASH_DEL(ptr1->data, ptr3);
+            free(ptr3);
         }
+        HASH_DEL(*head, ptr1);
+        free(ptr1);
     }
     return 0;
 }

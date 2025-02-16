@@ -116,6 +116,7 @@ int edbDeleteByArray(EasyDB *db, void** deleteRows[], size_t arraySize);        
 int edbDeleteByKeyword(EasyDB *db, char* columnName, char *keyword);                                                                //使用关键词删除
 int edbDeleteByKey(EasyDB *db, char* columnName, void* inKey);                                                                      //使用键删除
 int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const void*));                                            //排序
+size_t edbCount(EasyDB *db, char* columnName, void* inKey);                                                                         //获取匹配的项的个数
 
 /* Easy User Management */
 /* userID所在的列必须是主键列，密码所在的列请将列名设为“password” */

@@ -465,6 +465,17 @@ int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, siz
     return SUCCESS;
 }
 
+size_t edbCount(EasyDB *db, char* columnName, void* inKey)
+{
+    if (db == NULL || columnName == NULL || inKey == NULL)
+    {
+        return NULL_PTR_ERROR;
+    }
+    
+    int colIndex = columnNameToColumnIndex(db, columnName);
+    return IndexFind(&db->indexheads[colIndex], inKey, db->dataSizes[colIndex], NULL, 0);
+}
+
 int edbDelete(EasyDB *db, void* primaryKey)
 {
     if (db == NULL || primaryKey == NULL) return NULL_PTR_ERROR;
