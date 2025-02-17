@@ -15,8 +15,7 @@ typedef struct IndexNode
 {
     void* key;
     size_t keyLenth;
-    SetNode* data;
-    struct IndexNode* next;
+    SetNode* setHead;
     UT_hash_handle hh;
 }IndexNode;
 

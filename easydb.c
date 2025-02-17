@@ -163,7 +163,7 @@ int edbOpen(const char* filename, EasyDB* db)
     db->tail->next = NULL;
     EDBRow* ptr = db->head;
     EDBRow* pre = db->head;
-    char rbuf[db->lineSize];
+    char* rbuf = (char*)calloc(db->lineSize, sizeof(char));
     size_t cur_id = 0;
     while (fread(rbuf, 1, db->lineSize, dbfile))
     {
@@ -208,6 +208,8 @@ int edbOpen(const char* filename, EasyDB* db)
 
     db->tmpptr = db->head;
 
+    srand(time(NULL));
+    free(rbuf);
     fclose(dbfile);
     return SUCCESS;
 }
@@ -298,7 +300,7 @@ int edbSave(EasyDB *db)
 {
     if (db == NULL) return NULL_PTR_ERROR;
     
-    char fileHead[db->dataFileOffset];
+    char* fileHead = (char*)calloc(db->dataFileOffset + 10, sizeof(char));
     FILE* dbfileReadHead = fopen(db->dbfilename, "rb+");
     fread(fileHead, 1, db->dataFileOffset, dbfileReadHead);
     *(size_t*)&fileHead[4 + 4] = db->rowCount;
@@ -316,6 +318,7 @@ int edbSave(EasyDB *db)
         ptr = ptr->next;
     }
     fclose(dbfile);
+    free(fileHead);
     return SUCCESS;
 }
 
@@ -622,12 +625,12 @@ int edbDeleteByKey(EasyDB *db, char* columnName, void* inKey)
     if (db == NULL || inKey == NULL) return NULL_PTR_ERROR;
 
     void** findReshults[1000];
-    size_t reshultsCount = 0;
+    size_t resultsCount = 0;
     while (1)
     {
-        edbWhere(db, columnName, inKey, findReshults, 1000, &reshultsCount);
-        if (reshultsCount <= 0) break;
-        edbDeleteByArray(db, findReshults, reshultsCount);
+        edbWhere(db, columnName, inKey, findReshults, 1000, &resultsCount);
+        if (resultsCount <= 0) break;
+        edbDeleteByArray(db, findReshults, resultsCount);
     }
     return SUCCESS;
 }

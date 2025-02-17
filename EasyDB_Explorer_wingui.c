@@ -4,11 +4,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <windows.h>
 #include <winnt.h>
 #include <winuser.h>
 #include <commdlg.h>
 #include <commctrl.h>
+#include <richedit.h>
 #include <windowsx.h>
 #include <uxtheme.h> 
 #include "easydb.h"
@@ -16,6 +18,7 @@
 const char *appName = "EasyDB Explorer";
 const wchar_t* mainClassName = TEXT("MainWindow");
 const wchar_t* createDBClassName = TEXT("CreateNewDBWindow");
+const wchar_t* editColumnClassName = TEXT("EditColumnWindow");
 
 #define DEFAULT_WIDTH 1280
 #define DEFAULT_HEIGHT 720
@@ -36,17 +39,18 @@ char gbk_buffer[M_BUF_SIZ];
 char utf8_buffer[M_BUF_SIZ];
 wchar_t utf16_buffer[M_BUF_SIZ];
 char dbfilename[1024];
-HINSTANCE global_hInstance;
 HWND hMainWindow;
 HWND hMainListView;
 HWND hSearchBox;
 HWND hColumnNameComboBox;
+HMENU hRightClickMenu;
 EasyDB db;
 bool isEdited;              // 文件是否被被编辑
 HWND* editingEditBoxes;     // 存储正在编辑的编辑框
 size_t editingItem;         // 正在编辑的行
 HWND* addingEditBoxes;      // 存储正在添加的编辑框
 size_t addingItem;          // 正在添加的行
+int* rightClickMenus;
 
 wchar_t* utf8toutf16(const char* utf8text, wchar_t* utf16text, size_t utf16text_size)
 {
@@ -75,12 +79,22 @@ void ProcessDBListView(HWND hListView)      // 将数据库文件读取到ListVi
 
     LV_COLUMN lvCol;
     lvCol.mask = LVCF_TEXT | LVCF_WIDTH;    // 需要指定显示的字符和宽度
+    char* readAndEdit = "查看/编辑列 ";
+    char rightClickMenuStr[4096];
+    rightClickMenus = (int*)malloc(db.columnCount * sizeof(int));
     for (size_t i = 0; i < db.columnCount; i++)
     {
         lvCol.pszText = utf8toutf16(db.columnNames[i], utf16_buffer, M_BUF_SIZ);
         lvCol.cx = 150;
         ListView_InsertColumn(hListView, i, &lvCol);
+
         ComboBox_AddString(hColumnNameComboBox, lvCol.pszText); // 同时将列名添加到列选择框中
+
+        // 添加到右键菜单
+        strcpy(rightClickMenuStr, readAndEdit);
+        strcat(rightClickMenuStr, db.columnNames[i]);
+        rightClickMenus[i] = 10000 + i;
+        AppendMenuW(hRightClickMenu, MF_STRING, rightClickMenus[i], utf8toutf16(rightClickMenuStr, utf16_buffer, M_BUF_SIZ));
     }
 
     size_t cnt = 0;
@@ -118,13 +132,14 @@ void ProcessDBListView(HWND hListView)      // 将数据库文件读取到ListVi
     }
 }
 
-void ClearListViewAndComboBox(HWND hListView, size_t columnCount)  // 清除ListView
+void ClearLV_CB_RCMenu(HWND hListView, size_t columnCount)  // 清除ListView，列名选择组合框，右键菜单
 {
     ListView_DeleteAllItems(hListView);
     for (int i = 0; i < columnCount; i++)
     {
         ListView_DeleteColumn(hListView, 0); // 每次删除第一个列
         ComboBox_DeleteString(hColumnNameComboBox, 0);  // 每次删除列选择框中的第一个列
+        DeleteMenu(hRightClickMenu, 0, MF_BYPOSITION);
     }
 }
 
@@ -135,12 +150,12 @@ void OpenDBFile(HWND hListView)
         int result = MessageBox(hMainListView, TEXT("是否保存文件并打开新文件？"), TEXT("打开新文件"), MB_YESNOCANCEL);
         if (result == IDYES)
         {
-            ClearListViewAndComboBox(hMainListView, db.columnCount);
+            ClearLV_CB_RCMenu(hMainListView, db.columnCount);
             edbClose(&db);
         }
         else if (result == IDNO)
         {
-            ClearListViewAndComboBox(hMainListView, db.columnCount);
+            ClearLV_CB_RCMenu(hMainListView, db.columnCount);
             edbCloseNotSave(&db);
         }
         else if (result == IDCANCEL)
@@ -150,7 +165,7 @@ void OpenDBFile(HWND hListView)
     }
     else if (db.dbfilename && !isEdited)
     {
-        ClearListViewAndComboBox(hMainListView, db.columnCount);
+        ClearLV_CB_RCMenu(hMainListView, db.columnCount);
         edbCloseNotSave(&db);
     }
 
@@ -308,7 +323,7 @@ void AddNewOver_ReadEdit(HWND hListView)  // 结束添加
     
     for (size_t i = 0; i < db.columnCount; i++) // 逐列处理
     {
-        wchar_t* readBuf = (wchar_t*)calloc(db.dataSizes[i] * 2, sizeof(wchar_t));
+        wchar_t* readBuf = (wchar_t*)calloc(db.dataSizes[i] * 4, sizeof(wchar_t));
         edb_int readInt;
         edb_real readReal;
         GetWindowTextW(addingEditBoxes[i], readBuf, db.dataSizes[i] * 4); // 读取编辑框的内容
@@ -360,6 +375,7 @@ void EditStart_SetEdit(HWND hListView)  // 开始编辑
         return;
     }
     
+    ListView_EnsureVisible(hListView, selectedItem, TRUE);      // 确保列表视图项完全可见，如有必要，滚动列表视图控件。
 
     RECT rect;  // 存放每个项的位置区域信息，用于创建文本框
     editingEditBoxes = (HWND*)malloc(db.columnCount * sizeof(HWND)); // 分配空间用于存储文本框句柄
@@ -385,7 +401,7 @@ void EditStart_SetEdit(HWND hListView)  // 开始编辑
         editingEditBoxes[i] = CreateWindowExW(WS_EX_CLIENTEDGE,
                                                 WC_EDIT,
                                                 TEXT(""),
-                                                WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+                                                WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | WS_TABSTOP,
                                                 rect.left,
                                                 rect.top,
                                                 rect.right - rect.left,
@@ -402,7 +418,7 @@ void EditStart_SetEdit(HWND hListView)  // 开始编辑
         // 发送到编辑框
         SetWindowTextW(editingEditBoxes[i], pszTextBuf);
         // 设置编辑框的 Z 顺序 确保编辑框位于 ListView 的上方，避免被 ListView 覆盖。
-        // SetWindowPos(editingEditWindows[i], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        // SetWindowPos(editingEditBoxes[i], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
         free(pszTextBuf);
     }
 }
@@ -525,7 +541,7 @@ void SearchButtonPressed(HWND hListView, HWND hInputBox)
     int retval = Edit_GetText(hInputBox, keyWordBuf, db.dataSizes[colIndex]);
     if (retval == 0)    // 如果搜索框输入为空，则显示所有内容
     {
-        ClearListViewAndComboBox(hListView, db.columnCount);
+        ClearLV_CB_RCMenu(hListView, db.columnCount);
         ProcessDBListView(hListView);
         return;
     }
@@ -576,6 +592,160 @@ void SearchButtonPressed(HWND hListView, HWND hInputBox)
         }
     }
     return;
+}
+
+#define CONFIRM_EDIT_BUTTON 2001        // 确认更改按钮
+#define EDIT_COL_CANCEL_BUTTON 2002     // 取消按钮
+HWND hEditColEditBox;
+char* editRowPriKey;
+int editingItemIndex = -1;              // 正在编辑的行
+int editingColumnIndex = -1;            // 正在编辑的列
+LRESULT CALLBACK EditColumnWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    switch (uMsg)
+    {
+    case WM_CREATE:{
+        // 获取窗口默认字体，后续设置字体为相同，避免按键字体奇怪
+        HFONT hFont = (HFONT)SendMessageW(hwnd, WM_GETFONT, 0, 0);
+        if (hFont == NULL) {
+            hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+        }
+        HWND hButton;
+        // 确认更改按钮
+        hButton = CreateWindowExW(0, TEXT("BUTTON"), 
+                                    TEXT("确认更改"),
+                                    WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                    410, 365, 70, 30, 
+                                    hwnd, 
+                                    (HMENU)CONFIRM_EDIT_BUTTON, 
+                                    GetModuleHandle(NULL), 
+                                    NULL);
+        SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+        // 取消按钮
+        hButton = CreateWindowExW(0, TEXT("BUTTON"), 
+                                    TEXT("取消"),
+                                    WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                    490, 365, 70, 30, 
+                                    hwnd, 
+                                    (HMENU)EDIT_COL_CANCEL_BUTTON, 
+                                    GetModuleHandle(NULL), 
+                                    NULL);
+        SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+        // 查看/编辑框
+        hEditColEditBox = CreateWindowExW(WS_EX_CLIENTEDGE,
+                                            WC_EDIT,
+                                            TEXT(""),
+                                            WS_CHILD | WS_VISIBLE | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL,
+                                            10, 10, 580, 350,
+                                            hwnd,
+                                            NULL,
+                                            GetModuleHandle(NULL),
+                                            NULL);
+        SendMessageW(hEditColEditBox, WM_SETFONT, (WPARAM)hFont, TRUE);
+        break;
+    }
+    case WM_COMMAND:{
+        if (LOWORD(wParam) == CONFIRM_EDIT_BUTTON)
+        {
+            // 获取主键
+            edb_int priKeyInt;
+            edb_real priKeyReal;
+            void* priKey = NULL;
+            switch (db.dataTypes[db.primaryKeyIndex])
+            {
+            case EDB_TYPE_INT:
+                sscanf(editRowPriKey, "%lld", &priKeyInt);
+                priKey = &priKeyInt;
+                break;
+            case EDB_TYPE_REAL:
+                sscanf(editRowPriKey, "%lf", &priKeyReal);
+                priKey = &priKeyReal;
+                break;
+            case EDB_TYPE_TEXT:
+                priKey = editRowPriKey;
+                break;
+            default:
+                break;
+            }
+
+            int retval = 0;
+            edb_int editedInt;
+            edb_real editedReal;
+            wchar_t* editedBuf = (wchar_t*)calloc(db.dataSizes[editingColumnIndex] * 4, sizeof(wchar_t));
+            Edit_GetText(hEditColEditBox, editedBuf, db.dataSizes[editingColumnIndex] * 4);
+            switch (db.dataTypes[editingColumnIndex])
+            {
+            case EDB_TYPE_INT:
+                swscanf(editedBuf, L"%lld", &editedInt);
+                retval = edbUpdate(&db, priKey, db.columnNames[editingColumnIndex], &editedInt);
+                break;
+            case EDB_TYPE_REAL:
+                swscanf(editedBuf, L"%lf", &editedReal);
+                retval = edbUpdate(&db, priKey, db.columnNames[editingColumnIndex], &editedReal);
+                break;
+            case EDB_TYPE_TEXT:
+                retval = edbUpdate(&db, priKey, db.columnNames[editingColumnIndex], utf16toutf8(editedBuf, utf8_buffer, M_BUF_SIZ));
+                break;
+            default:
+                break;
+            }
+
+            if (retval == SUCCESS)
+            {
+                isEdited = true;
+                ListView_SetItemText(hMainListView, editingItemIndex, editingColumnIndex, editedBuf);
+            }
+            free(editedBuf);
+            ShowWindow(hwnd, SW_HIDE);
+            DestroyWindow(hwnd);
+        }
+        else if (LOWORD(wParam) == EDIT_COL_CANCEL_BUTTON)
+        {
+            ShowWindow(hwnd, SW_HIDE);
+            DestroyWindow(hwnd);
+        }
+        break;
+    }
+    case WM_SIZE:           // 处理用户改变窗口大小
+    {
+        int newWidth = LOWORD(lParam);
+        int newHeight = HIWORD(lParam);
+        HWND hButton;
+
+        hButton = GetDlgItem(hwnd, CONFIRM_EDIT_BUTTON);
+        MoveWindow(hButton, newWidth - 190, newHeight - 35, 70, 30, TRUE);        // 修改确认按钮的大小
+        hButton = GetDlgItem(hwnd, EDIT_COL_CANCEL_BUTTON);
+        MoveWindow(hButton, newWidth - 110, newHeight - 35, 70, 30, TRUE);        // 修改取消按钮的大小
+
+        MoveWindow(hEditColEditBox, 10, 10, newWidth - 20, newHeight - 50, TRUE);  // 修改编辑框的大小
+
+        InvalidateRect(hwnd, NULL, TRUE);  // 强制重绘窗口
+        break;
+    }
+    case WM_PAINT:          // 处理窗口重绘
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+            
+        // 填充窗口背景色
+        FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
+
+        EndPaint(hwnd, &ps);
+        break;
+    }
+    case WM_CLOSE:
+        break;
+    case WM_DESTROY:
+        // 释放主键缓存
+        free(editRowPriKey); editRowPriKey = NULL;
+        // 重置正在编辑的行和列
+        editingItemIndex = -1;
+        editingColumnIndex = -1;
+        break;
+    default:
+        break;
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
 #define CREATE_COMPLETE_BUTTON 1001     // 完成按钮
@@ -890,24 +1060,6 @@ LRESULT CALLBACK CreateDBWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
     return 0;
 }
 
-void CreateNewDB()
-{   
-    // 创建窗口
-    HWND hCreateDBWindow = CreateWindowExW(WS_EX_CLIENTEDGE,
-                                            createDBClassName, 
-                                            TEXT("新建数据库"), 
-                                            WS_OVERLAPPEDWINDOW & ~WS_SIZEBOX & ~WS_MAXIMIZEBOX,  // 禁止大小调整和最大化
-                                            CW_USEDEFAULT, CW_USEDEFAULT, 
-                                            600, 400, 
-                                            NULL, NULL, 
-                                            global_hInstance,
-                                            NULL);
-    
-    // 显示窗口
-    ShowWindow(hCreateDBWindow, SW_SHOW);
-    UpdateWindow(hCreateDBWindow);
-}
-
 void OpenFileDialogAndProcess(HWND hwnd) // 选择文件对话框
 {
     OPENFILENAME ofn;          // 文件选择对话框的结构体
@@ -947,45 +1099,45 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             HWND hButton;
             // “新建”按钮
             hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("新建"),
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                10, 10, 60, 25, 
-                hwnd, (HMENU)NEW_DB_BUTTON, 
-                GetModuleHandle(NULL), NULL);
+                                        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                        10, 10, 60, 25, 
+                                        hwnd, (HMENU)NEW_DB_BUTTON, 
+                                        GetModuleHandle(NULL), NULL);
             SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
             // “打开”按钮
             hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("打开"),
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                80, 10, 60, 25, 
-                hwnd, (HMENU)OPEN_FILE_BUTTON, 
-                GetModuleHandle(NULL), NULL);
+                                        WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                                        80, 10, 60, 25, 
+                                        hwnd, (HMENU)OPEN_FILE_BUTTON, 
+                                        GetModuleHandle(NULL), NULL);
             SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
             // “保存”按钮
             hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("保存"),
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                150, 10, 60, 25, 
-                hwnd, (HMENU)SAVE_FILE_BUTTON, 
-                GetModuleHandle(NULL), NULL);
+                                        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                        150, 10, 60, 25, 
+                                        hwnd, (HMENU)SAVE_FILE_BUTTON, 
+                                        GetModuleHandle(NULL), NULL);
             SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
             // “新增”按钮
             hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("新增"),
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_CHECKBOX,
-                220, 10, 60, 25, 
-                hwnd, (HMENU)ADDNEW_BUTTON, 
-                GetModuleHandle(NULL), NULL);
+                                        WS_VISIBLE | WS_CHILD | BS_CHECKBOX,
+                                        220, 10, 60, 25, 
+                                        hwnd, (HMENU)ADDNEW_BUTTON, 
+                                        GetModuleHandle(NULL), NULL);
             SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
             // “编辑”按钮
             hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("编辑"),
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_CHECKBOX,
-                290, 10, 60, 25, 
-                hwnd, (HMENU)EDIT_BUTTON, 
-                GetModuleHandle(NULL), NULL);
+                                        WS_VISIBLE | WS_CHILD | BS_CHECKBOX,
+                                        290, 10, 60, 25, 
+                                        hwnd, (HMENU)EDIT_BUTTON, 
+                                        GetModuleHandle(NULL), NULL);
             SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
             // “删除”按钮
             hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("删除"),
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                360, 10, 60, 25, 
-                hwnd, (HMENU)DELETE_BUTTON, 
-                GetModuleHandle(NULL), NULL);
+                                        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                        360, 10, 60, 25, 
+                                        hwnd, (HMENU)DELETE_BUTTON, 
+                                        GetModuleHandle(NULL), NULL);
             SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
             // 列选择组合框
             hColumnNameComboBox = CreateWindowExW(0, WC_COMBOBOX,
@@ -1006,88 +1158,196 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             SendMessageW(hSearchBox, WM_SETFONT, (WPARAM)hFont, TRUE);
             // “搜索”按钮
             hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("搜索"),
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                 870, 10, 60, 25, 
                 hwnd, (HMENU)SEARCH_BUTTON, 
                 GetModuleHandle(NULL), NULL);
             SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
             // 预览列表
             hMainListView = CreateWindowExW(WS_EX_CLIENTEDGE,    // 扩展窗口样式，带边框
-                    WC_LISTVIEW, TEXT(""),
-                    WS_CHILD | WS_VISIBLE | LVS_REPORT,
-                    10, 50, DEFAULT_WIDTH - 30, DEFAULT_HEIGHT - 60,
-                    hwnd, (HMENU)DB_LIST_VIEW,
-                    GetModuleHandle(NULL), NULL);
+                                            WC_LISTVIEW, 
+                                            TEXT(""),
+                                            WS_CHILD | WS_VISIBLE | LVS_REPORT,
+                                            10, 50, DEFAULT_WIDTH - 30, DEFAULT_HEIGHT - 60,
+                                            hwnd, 
+                                            (HMENU)DB_LIST_VIEW,
+                                            GetModuleHandle(NULL), 
+                                            NULL);
             // SendMessageW(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);   // 整行选中
             // SendMessageW(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES, LVS_EX_CHECKBOXES);         // 复选框
             ListView_SetExtendedListViewStyle(hMainListView, LVS_EX_FULLROWSELECT);
+            // 右键菜单
+            hRightClickMenu = CreatePopupMenu();
             break;
         }
         case WM_COMMAND:{
-            if (LOWORD(wParam) == NEW_DB_BUTTON)             // “新建”按钮被按下
-            {
-                CreateNewDB();
-            }
-            else if (LOWORD(wParam) == OPEN_FILE_BUTTON)     // “打开”按钮被按下
-            {
-                OpenFileDialogAndProcess(hwnd);
-            }
-            else if (LOWORD(wParam) == SAVE_FILE_BUTTON)     // “保存”按钮被按下
-            {
-                if (db.dbfilename)
+            switch (LOWORD(wParam)){
+                case NEW_DB_BUTTON:        // “新建”按钮被按下
                 {
-                    isEdited = false;
-                    edbSave(&db);
+                    // 创建窗口
+                    HWND hCreateDBWindow = CreateWindowExW(WS_EX_CLIENTEDGE,
+                                                            createDBClassName, 
+                                                            TEXT("新建数据库"), 
+                                                            WS_OVERLAPPEDWINDOW & ~WS_SIZEBOX & ~WS_MAXIMIZEBOX,  // 禁止大小调整和最大化
+                                                            CW_USEDEFAULT, CW_USEDEFAULT, 
+                                                            600, 400, 
+                                                            NULL, NULL, 
+                                                            GetModuleHandle(NULL),
+                                                            NULL);
+
+                    // 显示窗口
+                    ShowWindow(hCreateDBWindow, SW_SHOW);
+                    UpdateWindow(hCreateDBWindow);
+                    break;
+                }
+                case OPEN_FILE_BUTTON:     // “打开”按钮被按下
+                {
+                    OpenFileDialogAndProcess(hwnd);
+                    break;
+                }
+                case SAVE_FILE_BUTTON:     // “保存”按钮被按下
+                {
+                    if (db.dbfilename)
+                    {
+                        isEdited = false;
+                        edbSave(&db);
+                    }
+                    break;
+                }
+                case ADDNEW_BUTTON:        // “新增”按钮被按下
+                {
+                    HWND hButton = (HWND)lParam;
+                    if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
+                    {
+                        isEdited = true;
+                        SendMessageW(hButton, BM_SETCHECK, BST_CHECKED, 0);
+                        AddNewStart_SetEdit(hMainListView);
+                    }
+                    else if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_CHECKED)
+                    {
+                        isEdited = true;
+                        SendMessageW(hButton, BM_SETCHECK, BST_UNCHECKED, 0);
+                        AddNewOver_ReadEdit(hMainListView);
+                    }
+                    break;
+                }
+                case EDIT_BUTTON:          // “编辑”按钮被按下
+                {
+                    HWND hButton = (HWND)lParam;
+                    if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
+                    {
+                        isEdited = true;
+                        SendMessageW(hButton, BM_SETCHECK, BST_CHECKED, 0);
+                        EditStart_SetEdit(hMainListView);
+                    }
+                    else if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_CHECKED)
+                    {
+                        isEdited = true;
+                        SendMessageW(hButton, BM_SETCHECK, BST_UNCHECKED, 0);
+                        EditOver_ReadEdit(hMainListView);
+                    }
+                    break;
+                }
+                case DELETE_BUTTON:        // “删除”按钮被按下
+                {
+                    if (db.dbfilename)
+                    {
+                        isEdited = true;
+                        DeleteButtonPressed(hMainListView);
+                    }
+                    break;
+                }
+                case SEARCH_BUTTON:
+                {
+                    if (db.dbfilename)
+                    {
+                        SearchButtonPressed(hMainListView, hSearchBox);
+                    }
+                    break;
+                }
+                default:
+                {
+                    // 获取选中的列
+                    int selectedCol = 0;
+                    for (selectedCol = 0; selectedCol < db.columnCount; selectedCol++)
+                    {
+                        if (LOWORD(wParam) == rightClickMenus[selectedCol]) break;
+                    }
+                    if (selectedCol >= db.columnCount) break;
+
+                    // 创建窗口
+                    HWND hEditColumnWindow = CreateWindowExW(WS_EX_CLIENTEDGE,
+                                                                editColumnClassName, 
+                                                                TEXT("查看/编辑列"), 
+                                                                WS_OVERLAPPEDWINDOW,
+                                                                CW_USEDEFAULT, CW_USEDEFAULT, 
+                                                                600, 400, 
+                                                                NULL, NULL, 
+                                                                GetModuleHandle(NULL),
+                                                                NULL);
+
+                    // 显示窗口
+                    ShowWindow(hEditColumnWindow, SW_SHOW);
+                    UpdateWindow(hEditColumnWindow);
+
+                    // 暂存主键
+                    int selectedItem = ListView_GetNextItem(hMainListView, -1, LVNI_SELECTED);
+                    ListView_GetItemText(hMainListView, selectedItem, db.primaryKeyIndex, utf16_buffer, M_BUF_SIZ);
+                    editRowPriKey = (char*)calloc(db.dataSizes[db.primaryKeyIndex] * 4, sizeof(char));
+                    utf16toutf8(utf16_buffer, editRowPriKey, db.dataSizes[db.primaryKeyIndex] * 4);
+
+                    // 保存行列索引
+                    editingColumnIndex = selectedCol;
+                    editingItemIndex = selectedItem;
+
+                    // 设置标题
+                    char* titleTmp = (char*)calloc(strlen(db.columnNames[selectedCol]) + 32, sizeof(char));
+                    strcpy(titleTmp, "查看/编辑列 ");
+                    strcat(titleTmp, db.columnNames[selectedCol]);
+                    SetWindowTextW(hEditColumnWindow, utf8toutf16(titleTmp, utf16_buffer, M_BUF_SIZ));
+                    free(titleTmp);
+
+                    // 把原来的文字传过去
+                    ListView_GetItemText(hMainListView, selectedItem, selectedCol, utf16_buffer, M_BUF_SIZ);
+                    Edit_SetText(hEditColEditBox, utf16_buffer);
+                    break;
                 }
             }
-            else if (LOWORD(wParam) == ADDNEW_BUTTON)        // “新增”按钮被按下
+            break;
+        }
+        case WM_NOTIFY: {                                           // 处理点击表头，进行排序
+            LPNMLISTVIEW lpnmh = (LPNMLISTVIEW)lParam;
+            if (((LPNMHDR)lParam)->code == LVN_COLUMNCLICK) 
             {
-                HWND hButton = (HWND)lParam;
-                if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
+                // 获取点击的列
+                int clickedColumn = lpnmh->iSubItem;
+                
+                if (db.dataTypes[clickedColumn] != EDB_TYPE_BLOB)
                 {
-                    isEdited = true;
-                    SendMessageW(hButton, BM_SETCHECK, BST_CHECKED, 0);
-                    AddNewStart_SetEdit(hMainListView);
-                }
-                else if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_CHECKED)
-                {
-                    isEdited = true;
-                    SendMessageW(hButton, BM_SETCHECK, BST_UNCHECKED, 0);
-                    AddNewOver_ReadEdit(hMainListView);
+                    int retval = edbSort(&db, db.columnNames[clickedColumn], NULL);
+                    if (retval == SUCCESS)
+                    {
+                        isEdited = true;
+                        ClearLV_CB_RCMenu(hMainListView, db.columnCount);
+                        ProcessDBListView(hMainListView);
+                    }
                 }
             }
-            else if (LOWORD(wParam) == EDIT_BUTTON)          // “编辑”按钮被按下
-            {
-                HWND hButton = (HWND)lParam;
-                if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
-                {
-                    isEdited = true;
-                    SendMessageW(hButton, BM_SETCHECK, BST_CHECKED, 0);
-                    EditStart_SetEdit(hMainListView);
-                }
-                else if (db.dbfilename && SendMessageW(hButton, BM_GETCHECK, 0, 0) == BST_CHECKED)
-                {
-                    isEdited = true;
-                    SendMessageW(hButton, BM_SETCHECK, BST_UNCHECKED, 0);
-                    EditOver_ReadEdit(hMainListView);
-                }
-            }
-            else if (LOWORD(wParam) == DELETE_BUTTON)        // “删除”按钮被按下
-            {
-                if (db.dbfilename)
-                {
-                    isEdited = true;
-                    DeleteButtonPressed(hMainListView);
+            break;
+        }
+        case WM_CONTEXTMENU:{
+            if ((HWND)wParam == hMainListView) {
+                POINT pt;
+                GetCursorPos(&pt);  // 获取鼠标位置
+
+                // 获取选中的项
+                int selectedItem = ListView_GetNextItem(hMainListView, -1, LVNI_SELECTED);
+                
+                if (selectedItem != -1) {  // 确保点击了有效项
+                    // 弹出右键菜单
+                    TrackPopupMenu(hRightClickMenu, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hwnd, NULL);
                 }
             }
-            else if (LOWORD(wParam) == SEARCH_BUTTON)
-            {
-                if (db.dbfilename)
-                {
-                    SearchButtonPressed(hMainListView, hSearchBox);
-                }
-            }
-            
             break;
         }
         case WM_DROPFILES:{     // 处理拖入文件
@@ -1100,6 +1360,37 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 
             // 释放拖拽句柄
             DragFinish(hDrop);
+            break;
+        }
+        case WM_KEYDOWN:{       // 试图处理TAB键
+            HWND focus = GetFocus();
+            if (focus == hMainListView)
+            {
+                break;
+            }
+            else
+            {
+                if (addingEditBoxes)
+                {
+                    int focusIndex = 0;
+                    for (focusIndex = 0; focusIndex < db.columnCount; ++focusIndex)
+                    {
+                        if (addingEditBoxes[focusIndex] == focus) break;
+                    }
+                    if (focusIndex >= db.columnCount) break;
+                    SetFocus(addingEditBoxes[(focusIndex + 1) % db.columnCount]);
+                }
+                else if (editingEditBoxes)
+                {
+                    int focusIndex = 0;
+                    for (focusIndex = 0; focusIndex < db.columnCount; ++focusIndex)
+                    {
+                        if (editingEditBoxes[focusIndex] == focus) break;
+                    }
+                    if (focusIndex >= db.columnCount) break;
+                    SetFocus(editingEditBoxes[(focusIndex + 1) % db.columnCount]);
+                }
+            }
             break;
         }
         case WM_SIZE:           // 处理用户改变窗口大小
@@ -1151,7 +1442,8 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-    global_hInstance = hInstance;
+    int argc;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc); // 获取启动命令行信息
     // 注册主窗口类
     WNDCLASS mainwc = {0};
     mainwc.lpfnWndProc = MainWindowProc;
@@ -1167,6 +1459,14 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     createwc.lpszClassName = createDBClassName;
     createwc.hIcon = LoadIcon(hInstance, TEXT("IDR_MAINICON")); // 设置图标
     RegisterClass(&createwc);
+
+    // 注册查看/编辑列窗口类
+    WNDCLASS editColwc = {0};
+    editColwc.lpfnWndProc = EditColumnWindowProc;
+    editColwc.hInstance = hInstance;
+    editColwc.lpszClassName = editColumnClassName;
+    editColwc.hIcon = LoadIcon(hInstance, TEXT("IDR_MAINICON")); // 设置图标
+    RegisterClass(&editColwc);
 
     // 创建窗口
     hMainWindow = CreateWindowExW(WS_EX_ACCEPTFILES | WS_EX_CLIENTEDGE,    // 可拖入文件
@@ -1192,6 +1492,12 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
     // 初始化 Common Controls 库
     InitCommonControls();
+
+    if (argc > 1)   // 启动时若附加了文件，则打开
+    {
+        strcpy(dbfilename, utf16toutf8(argv[1], utf8_buffer, M_BUF_SIZ));
+        OpenDBFile(hMainListView);
+    }
 
     // 消息循环
     MSG msg;
