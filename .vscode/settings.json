@@ -11,6 +11,7 @@
         "index.h": "c",
         "windows.h": "c",
         "uthash.h": "c",
-        "windows.foundation.h": "c"
+        "windows.foundation.h": "c",
+        "string.h": "c"
     }
 }

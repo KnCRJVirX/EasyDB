@@ -676,23 +676,87 @@ int edbDefaultCompareDoubles(const void *a, const void *b)
     return 0;
 }
 
+int merge(EDBRow* l1head, EDBRow* l2head, int columnIndex, int (*compareFunc)(const void*, const void*), EDBRow** sortedHead, EDBRow** sortedTail)
+{
+    EDBRow tmp;
+    EDBRow* ptr = &tmp;
+    while (l1head != NULL && l2head!= NULL)
+    {
+        if (compareFunc(l1head->data[columnIndex], l2head->data[columnIndex]) < 0)
+        {
+            ptr->next = l1head;
+            l1head->prev = ptr;
+            l1head = l1head->next;
+        }
+        else
+        {
+            ptr->next = l2head;
+            l2head->prev = ptr;
+            l2head = l2head->next;
+        }
+        ptr = ptr->next;
+    }
+    if (l1head)
+    {
+        ptr->next = l1head;
+        l1head->prev = ptr;
+    }
+    if (l2head)
+    {
+        ptr->next = l2head;
+        l2head->prev = ptr;
+    }
+    while (ptr->next != NULL)
+    {
+        ptr = ptr->next;
+    }
+    *sortedTail = ptr;
+    
+    ptr = tmp.next;
+    ptr->prev = NULL;
+    *sortedHead = ptr;
+    return 0;
+}
+
+EDBRow* findMiddle(EDBRow* head, EDBRow* tail)
+{
+    while (head != tail && head->next != tail)
+    {
+        head = head->next;
+        tail = tail->prev;
+    }
+    return head;
+}
+
+int* mergeSort(EDBRow* head, EDBRow* tail, int columnIndex, int (*compareFunc)(const void*, const void*), EDBRow** sortedHead, EDBRow** sortedTail)
+{
+    if (head == NULL || head->next == NULL)
+    {
+        *sortedHead = head;
+        *sortedTail = head;
+        return 0;
+    }
+    
+    EDBRow* mid = findMiddle(head, tail);
+    EDBRow* rightHead = mid->next;
+    rightHead->prev = NULL;
+    mid->next = NULL;
+
+    EDBRow *lHead, *lTail, *rHead, *rTail;
+    mergeSort(head, mid, columnIndex, compareFunc, &lHead, &lTail);
+    mergeSort(rightHead, tail, columnIndex, compareFunc, &rHead, &rTail);
+    
+    merge(lHead, rHead, columnIndex, compareFunc, sortedHead, sortedTail);
+    return 0;
+}
+
 int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const void*))
 {
     if (db == NULL || columnName == NULL)
     {
         return NULL_PTR_ERROR;
     }
-    if (db->rowCount == 0)
-    {
-        return EMPTY_TABLE;
-    }
-    int retval;
     long long colIndex = columnNameToColumnIndex(db, columnName);
-    bool exitFlag = 0;
-    if (colIndex < 0)
-    {
-        return colIndex;
-    }
     if (compareFunc == NULL)
     {
         switch (db->dataTypes[colIndex])
@@ -709,30 +773,27 @@ int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const 
             break;
         }
     }
-    
-    while (!exitFlag)
-    {
-        exitFlag = 1;
-        for (EDBRow* ptr = db->head->next; (ptr->next != db->tail && ptr->next != NULL); ptr = ptr->next)
-        {
-            EDBRow* ptrn = ptr->next;
-            retval = compareFunc(ptr->data[colIndex], ptrn->data[colIndex]);
-            if (retval > 0)
-            {
-                swapNode(ptr, ptrn);
-                exitFlag = 0;
-            }
-        }
-    }
-    return SUCCESS;
+    EDBRow* pHead = db->head;
+    EDBRow* pTail = db->tail;
+
+    EDBRow* realHead = pHead->next;
+    EDBRow* realTail = pTail->prev;
+
+    realHead->prev = NULL;
+    realTail->next = NULL;
+
+    EDBRow *sHead, *sTail;
+    mergeSort(pHead->next, pTail->prev, colIndex, compareFunc, &sHead, &sTail);
+
+    pHead->next = sHead;
+    sHead->prev = pHead;
+    pTail->prev = sTail;
+    sTail->next = pTail;
+    return 0;
 }
 
 char* uuid(char *UUID) 
-{
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    srand((unsigned int)(now.tv_sec * 1000 + now.tv_usec));  // 设置随机数种子
-    
+{   
     unsigned char random_bytes[16];
     int i;
 

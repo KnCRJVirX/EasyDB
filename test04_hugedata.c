@@ -237,6 +237,37 @@ int main(int argc, char const *argv[])
                 }
             }
         }
+        else if (!strcmp(command, "sort"))
+        {
+            scanf("%s", inColName);
+            edbSort(&db, inColName, NULL);
+        }
+        else if (!strcmp(command, "count"))
+        {
+            scanf("%s", inColName);
+            getchar();
+            fgets(buf, BUF_SIZE, stdin);
+            if (strchr(buf, '\n')) *(strchr(buf, '\n')) = 0;
+            columnIndex = columnNameToColumnIndex(&db, inColName);
+            switch (db.dataTypes[columnIndex])
+            {
+            case EDB_TYPE_INT:
+                tmpInputID = atoll(buf);
+                resultsCount = edbCount(&db, inColName, &tmpInputID);
+                break;
+            case EDB_TYPE_TEXT:
+                resultsCount = edbCount(&db, inColName, buf);
+                break;
+            default:
+                break;
+            }
+            if (resultsCount == 0)
+            {
+                printf("Not found!\n");
+                continue;
+            }
+            printf("%lld\n", resultsCount);
+        }
         else if (!strcmp(command, "quit"))
         {
             edbClose(&db);

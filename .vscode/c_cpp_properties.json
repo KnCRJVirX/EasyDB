@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}\\**",
                 "C:\\w64devkit\\x86_64-w64-mingw32\\include\\*",
-                "C:\\w64devkit\\lib\\gcc\\x86_64-w64-mingw32\\14.2.0\\include\\**"
+                "C:\\w64devkit\\lib\\gcc\\x86_64-w64-mingw32\\14.2.0\\include\\**",
+                "C:/w64devkit/lib/gcc/x86_64-w64-mingw32/14.2.0/include"
             ],
             "defines": [
                 "_DEBUG",

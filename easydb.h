@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
-#include <sys/time.h>
 #include "index.h"
 
 #ifndef EASYDB
