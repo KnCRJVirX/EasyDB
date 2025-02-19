@@ -58,7 +58,7 @@ typedef struct EasyDatabase
     int version;
     char* tableName;
     size_t rowCount;
-    size_t lineSize;                //一行的长度
+    size_t rowSize;                 //一行的长度
     size_t columnCount;             //每行有几个数据
     size_t primaryKeyIndex;         //主键在一行中的索引
     size_t *dataOffset;             //每个数据相比行首的偏移量
@@ -116,6 +116,8 @@ int edbDeleteByKeyword(EasyDB *db, char* columnName, char *keyword);            
 int edbDeleteByKey(EasyDB *db, char* columnName, void* inKey);                                                                      //使用键删除
 int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const void*));                                            //排序
 size_t edbCount(EasyDB *db, char* columnName, void* inKey);                                                                         //获取匹配的项的个数
+int edbImportCSV(EasyDB* db, char* csvFileName);
+int edbExportCSV(EasyDB* db, char* csvFileName);
 
 /* Easy User Management */
 /* userID所在的列必须是主键列，密码所在的列请将列名设为“password” */

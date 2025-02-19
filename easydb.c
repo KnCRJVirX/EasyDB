@@ -27,30 +27,30 @@ int edbCreate(const char* filename, const char* tableName, size_t columnCount, c
     size_t emptyLineCount = 0;
     fwrite(&emptyLineCount, EDB_INT_SIZE, 1, dbfile);
 
-    size_t lineSize = 0;
+    size_t rowSize = 0;
     for (size_t i = 0; i < columnCount; i++)
     {
         switch (dataTypes[i])
         {
         case EDB_TYPE_INT:
-            lineSize += EDB_INT_SIZE;
+            rowSize += EDB_INT_SIZE;
             dataSizes[i] = EDB_INT_SIZE;
             break;
         case EDB_TYPE_REAL:
-            lineSize += EDB_REAL_SIZE;
+            rowSize += EDB_REAL_SIZE;
             dataSizes[i] = EDB_REAL_SIZE;
             break;
         case EDB_TYPE_TEXT:
-            lineSize += dataSizes[i];
+            rowSize += dataSizes[i];
             break;
         case EDB_TYPE_BLOB:
-            lineSize += dataSizes[i];
+            rowSize += dataSizes[i];
             break;
         default:
             break;
         }
     }
-    fwrite(&lineSize, EDB_INT_SIZE, 1, dbfile);
+    fwrite(&rowSize, EDB_INT_SIZE, 1, dbfile);
 
     fwrite(&columnCount, EDB_INT_SIZE, 1, dbfile);
     fwrite(dataTypes, EDB_INT_SIZE, columnCount, dbfile);
@@ -89,7 +89,7 @@ int edbOpen(const char* filename, EasyDB* db)
     fread(&db->version, 4, 1, dbfile);                                      //版本号检查
 
     fread(&db->rowCount, EDB_INT_SIZE, 1, dbfile);                          //读取行数
-    fread(&db->lineSize, EDB_INT_SIZE, 1, dbfile);                           //读取行长度
+    fread(&db->rowSize, EDB_INT_SIZE, 1, dbfile);                           //读取行长度
     fread(&db->columnCount, EDB_INT_SIZE, 1, dbfile);                       //读取每行数据个数
 
     db->dataTypes = (size_t*)malloc(db->columnCount * sizeof(size_t));      //读取一行中每个数据的类型
@@ -163,9 +163,9 @@ int edbOpen(const char* filename, EasyDB* db)
     db->tail->next = NULL;
     EDBRow* ptr = db->head;
     EDBRow* pre = db->head;
-    char* rbuf = (char*)calloc(db->lineSize, sizeof(char));
+    char* rbuf = (char*)calloc(db->rowSize, sizeof(char));
     size_t cur_id = 0;
-    while (fread(rbuf, 1, db->lineSize, dbfile))
+    while (fread(rbuf, 1, db->rowSize, dbfile))
     {
         ptr->next = (EDBRow*)malloc(sizeof(EDBRow));
         ptr = ptr->next;
@@ -930,4 +930,132 @@ int easyResetPassword(EasyDB *db, char* userID, char* newPassword)
 
     int retval = edbUpdate(db, userID, "password", newpasswd_sha256);
     return retval;
+}
+
+int edbImportCSV(EasyDB* db, char* csvFileName)
+{
+    if (db == NULL || csvFileName == NULL)
+    {
+        return NULL_PTR_ERROR;
+    }
+    
+    FILE* csvFile = fopen(csvFileName, "r");
+    if (csvFile == NULL)
+    {
+        return FILE_OPEN_ERROR;
+    }
+
+    char* rowBuf = (char*)malloc(db->rowSize * sizeof(char) * 2);
+    fgets(rowBuf, db->rowSize, csvFile);    // 跳过表头
+    int retval = 0;
+
+    void** newRow = (void**)calloc(db->columnCount, sizeof(void*));
+    for (size_t i = 0; i < db->columnCount; i++)
+    {
+        newRow[i] = calloc(db->dataSizes[i], 1);
+    }
+    
+
+    while (fgets(rowBuf, db->rowSize, csvFile) != NULL)
+    {
+        if (strchr(rowBuf, '\n')) *(strchr(rowBuf, '\n')) = 0;    // 移除换行符
+        char* token = strtok(rowBuf, ",");  // 逗号分隔
+        size_t cnt = 0;
+
+        for (size_t i = 0; i < db->columnCount; i++)    // 清空上一行的内容
+        {
+            memset(newRow[i], 0, db->dataSizes[i]);
+        }
+
+        do
+        {
+            switch (db->dataTypes[cnt])
+            {
+            case EDB_TYPE_INT:
+                sscanf(token, "%lld", newRow[cnt]);
+                break;
+            case EDB_TYPE_REAL:
+                sscanf(token, "%lf", newRow[cnt]);
+                break;
+            case EDB_TYPE_TEXT:
+                strcpy(newRow[cnt], token);
+                break;
+            default:
+                break;
+            }
+
+            token = strtok(NULL, ",");
+            ++cnt;
+        } while (token != NULL && cnt < db->columnCount);
+        edbInsert(db, newRow);
+    }
+
+    free(rowBuf);
+    for (size_t i = 0; i < db->columnCount; i++)
+    {
+        free(newRow[i]);
+    }
+    free(newRow);
+    fclose(csvFile);
+    return SUCCESS;
+}
+
+int edbExportCSV(EasyDB* db, char* csvFileName)
+{
+    if (db == NULL || csvFileName == NULL)
+    {
+        return NULL_PTR_ERROR;
+    }
+    
+    FILE* csvFile = fopen(csvFileName, "w");
+    if (csvFile == NULL)
+    {
+        return FILE_OPEN_ERROR;
+    }
+
+    for (size_t i = 0; i < db->columnCount - 1; i++)    // 先打出表头
+    {
+        fprintf(csvFile, "%s,", db->columnNames[i]);
+    }
+    fprintf(csvFile, "%s\n", db->columnNames[db->columnCount - 1]);
+
+    for (void** it = edbIterBegin(db); it != NULL; it = edbIterNext(db))
+    {
+        size_t i;
+        for (i = 0; i < db->columnCount - 1; i++)
+        {
+            switch (db->dataTypes[i])
+            {
+            case EDB_TYPE_INT:
+                fprintf(csvFile, "%lld,", Int(it[i]));
+                break;
+            case EDB_TYPE_REAL:
+                fprintf(csvFile, "%lf,", Real(it[i]));
+                break;
+            case EDB_TYPE_TEXT:
+                fputs(Text(it[i]), csvFile);
+                fputc(',', csvFile);
+            default:
+                break;
+            }
+        }
+        i = db->columnCount - 1;
+        switch (db->dataTypes[i])   // 最后一个数据不加逗号
+        {
+        case EDB_TYPE_INT:
+            fprintf(csvFile, "%lld", Int(it[i]));
+            break;
+        case EDB_TYPE_REAL:
+            fprintf(csvFile, "%lf", Real(it[i]));
+            break;
+        case EDB_TYPE_TEXT:
+            fputs(Text(it[i]), csvFile);
+        default:
+            break;
+        }
+        fputc('\n', csvFile);       // 写入换行符
+    }
+    
+    fclose(csvFile);
+    return SUCCESS;
 }
