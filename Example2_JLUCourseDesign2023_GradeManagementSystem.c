@@ -150,7 +150,7 @@ int projectMgr(EasyDB *dbPo, char* ID, char* name)
                 printf("序号超出范围！\n");
                 break;
             }
-            retval = edbDelete(dbPo, searchResults[tmpID - 1][columnNameToColumnIndex(dbPo, "UUID")]);
+            retval = edbDelete(dbPo, searchResults[tmpID - 1][toColumnIndex(dbPo, "UUID")]);
             if (retval == SUCCESS)
             {
                 printf("删除成功！\n");
@@ -172,7 +172,7 @@ int projectMgr(EasyDB *dbPo, char* ID, char* name)
                 }
                 printf("新项目名称：");
                 mfgets(newRow[2], PROJECT_NAME_MAX_SIZE, stdin);
-                retval = edbUpdate(dbPo, searchResults[tmpID - 1][columnNameToColumnIndex(dbPo, "UUID")], "项目名称", newRow[2]);
+                retval = edbUpdate(dbPo, searchResults[tmpID - 1][toColumnIndex(dbPo, "UUID")], "项目名称", newRow[2]);
                 break;
             case 2:
                 printf("序号：");
@@ -185,7 +185,7 @@ int projectMgr(EasyDB *dbPo, char* ID, char* name)
                 }
                 printf("新项目详情：");
                 mfgets(newRow[3], PROJECT_DETAIL_MAX_SIZE, stdin);
-                retval = edbUpdate(dbPo, searchResults[tmpID - 1][columnNameToColumnIndex(dbPo, "UUID")], "项目详情", newRow[2]);
+                retval = edbUpdate(dbPo, searchResults[tmpID - 1][toColumnIndex(dbPo, "UUID")], "项目详情", newRow[2]);
                 break;
             default:
                 printf("请输入1或2！\n");
@@ -362,7 +362,7 @@ int processGradeTable(char* tableName)
         case 4:
             printf("要修改的列：");
             mfgets(tmpColName, 1024, stdin);
-            colIndex = columnNameToColumnIndex(&db, tmpColName);
+            colIndex = toColumnIndex(&db, tmpColName);
             if (colIndex == COLUMN_NOT_FOUND)
             {
                 printf("没有这一列！\n");
@@ -557,7 +557,7 @@ int processGradeTable(char* tableName)
         case 11:
             printf("列名：");
             mfgets(buf, 1024, stdin);
-            switch (db.dataTypes[columnNameToColumnIndex(&db, buf)])
+            switch (db.dataTypes[toColumnIndex(&db, buf)])
             {
             case EDB_TYPE_REAL:
                 retval = edbSort(&db, buf, cmpDoubles);

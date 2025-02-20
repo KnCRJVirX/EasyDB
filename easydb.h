@@ -66,7 +66,8 @@ typedef struct EasyDatabase
     size_t *dataSizes;              //每个数据的长度
     char** columnNames;             //列名
     long long dataFileOffset;       //数据在文件中开始的位置
-    IndexNode** indexheads;              //索引表头指针存储
+    IndexNode** indexheads;         //索引表头指针存储
+    IndexNode* colNameIndexHead;    //列名转列索引的哈希表头
 }EasyDatabase;
 typedef EasyDatabase EasyDB;
 
@@ -106,7 +107,7 @@ int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, siz
 int edbUpdate(EasyDB *db, void* primaryKey, char* updateColumnName, void* newData);                                                 //修改
 
 /*便利API*/
-long long columnNameToColumnIndex(EasyDB *db, char *columnName);                                                                    //将列名转换为列索引
+long long toColumnIndex(EasyDB *db, char *columnName);                                                                    //将列名转换为列索引
 void** edbIterBegin(EasyDB *db);                                                                                                    //数据库遍历（返回一个指向第一行数据的指针）
 void** edbIterNext(EasyDB *db);                                                                                                     //返回指向下一行数据的指针
 void* edbGet(EasyDB *db, void* primaryKey, char* columnName);
@@ -117,7 +118,7 @@ int edbDeleteByKey(EasyDB *db, char* columnName, void* inKey);                  
 int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const void*));                                            //排序
 size_t edbCount(EasyDB *db, char* columnName, void* inKey);                                                                         //获取匹配的项的个数
 int edbImportCSV(EasyDB* db, char* csvFileName);
-int edbExportCSV(EasyDB* db, char* csvFileName);
+int edbExportCSV(EasyDB* db, char* csvFileName, bool withBOM);
 
 /* Easy User Management */
 /* userID所在的列必须是主键列，密码所在的列请将列名设为“password” */

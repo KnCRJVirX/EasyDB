@@ -84,7 +84,7 @@ int main(int argc, char const *argv[])
             getchar();
             fgets(buf, BUF_SIZE, stdin);
             if (strchr(buf, '\n')) *(strchr(buf, '\n')) = 0;
-            columnIndex = columnNameToColumnIndex(&db, inColName);
+            columnIndex = toColumnIndex(&db, inColName);
             size_t resultsCount;
             switch (db.dataTypes[columnIndex])
             {
@@ -127,7 +127,7 @@ int main(int argc, char const *argv[])
         else if (!strcmp(command, "update"))
         {
             scanf("%lld %s %s", &tmpInputID, inColName, buf);
-            columnIndex = columnNameToColumnIndex(&db, inColName);
+            columnIndex = toColumnIndex(&db, inColName);
             switch (db.dataTypes[columnIndex])
             {
             case EDB_TYPE_INT:
@@ -201,15 +201,15 @@ int main(int argc, char const *argv[])
             {
                 printf("NULL\n");
             }
-            else if (db.dataTypes[columnNameToColumnIndex(&db, buf)] == EDB_TYPE_INT)
+            else if (db.dataTypes[toColumnIndex(&db, buf)] == EDB_TYPE_INT)
             {
                 printf("%d\n", Int(res));
             }
-            else if (db.dataTypes[columnNameToColumnIndex(&db, buf)] == EDB_TYPE_TEXT)
+            else if (db.dataTypes[toColumnIndex(&db, buf)] == EDB_TYPE_TEXT)
             {
                 printf("%s\n", Text(res));
             }
-            else if (db.dataTypes[columnNameToColumnIndex(&db, buf)] == EDB_TYPE_REAL)
+            else if (db.dataTypes[toColumnIndex(&db, buf)] == EDB_TYPE_REAL)
             {
                 printf("%lf\n", Real(res));
             }
@@ -217,15 +217,15 @@ int main(int argc, char const *argv[])
         else if (!strcmp(command, "sort"))
         {
             scanf("%s", buf);
-            if (db.dataTypes[columnNameToColumnIndex(&db, buf)] == EDB_TYPE_INT)
+            if (db.dataTypes[toColumnIndex(&db, buf)] == EDB_TYPE_INT)
             {
                 retval = edbSort(&db, buf, cmpInts);
             }
-            else if (db.dataTypes[columnNameToColumnIndex(&db, buf)] == EDB_TYPE_REAL)
+            else if (db.dataTypes[toColumnIndex(&db, buf)] == EDB_TYPE_REAL)
             {
                 retval = edbSort(&db, buf, cmpDoubles);
             }
-            else if (db.dataTypes[columnNameToColumnIndex(&db, buf)] == EDB_TYPE_TEXT)
+            else if (db.dataTypes[toColumnIndex(&db, buf)] == EDB_TYPE_TEXT)
             {
                 retval = edbSort(&db, buf, (int(*)(const void*, const void*))strcmp);
             }

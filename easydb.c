@@ -101,6 +101,7 @@ int edbOpen(const char* filename, EasyDB* db)
     char colNameBuf[4096];                                                  //读取列名
     size_t colNameLen;
     db->columnNames = (char**)malloc(db->columnCount * sizeof(char*));
+    db->colNameIndexHead = NULL;
     for (size_t i = 0; i < db->columnCount; i++)
     {
         colNameLen = 0;
@@ -112,6 +113,8 @@ int edbOpen(const char* filename, EasyDB* db)
         } while (c != 0 && c < 4096);
         db->columnNames[i] = (char*)malloc(colNameLen);
         strcpy(db->columnNames[i], colNameBuf);
+        // 将列名和列索引插入哈希表
+        IndexInsert(&db->colNameIndexHead, db->columnNames[i], strlen(db->columnNames[i]), (void*)i);
     }
 
     if (db->version >= 1)
@@ -153,9 +156,9 @@ int edbOpen(const char* filename, EasyDB* db)
         }
     }
 
-    db->dataFileOffset = ftell(dbfile);                                     //记录数据开始的位置
+    db->dataFileOffset = ftell(dbfile); //记录数据开始的位置
 
-    db->indexheads = (IndexNode**)calloc(db->columnCount, sizeof(IndexNode*));                //初始化索引表头指针
+    db->indexheads = (IndexNode**)calloc(db->columnCount, sizeof(IndexNode*));  //初始化索引表头指针
 
     db->head = (EDBRow*)malloc(sizeof(EDBRow));
     db->head->prev = NULL;
@@ -280,6 +283,7 @@ int edbClose(EasyDB *db)
     {
         IndexClear(&db->indexheads[i]);
     }
+    IndexClear(&db->colNameIndexHead);
     
     for (size_t i = 0; i < db->columnCount; i++) free(db->columnNames[i]);
     free(db->columnNames); db->columnNames = NULL;
@@ -440,7 +444,7 @@ int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult)
 int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, size_t maxResultNumber, size_t *resultsCount)
 {   
     if (db == NULL || inKey == NULL) return NULL_PTR_ERROR;
-    long long columnIndex = columnNameToColumnIndex(db, columnName);
+    long long columnIndex = toColumnIndex(db, columnName);
     if (columnIndex < 0) return COLUMN_NOT_FOUND;
     
     size_t retval = 0;
@@ -475,7 +479,7 @@ size_t edbCount(EasyDB *db, char* columnName, void* inKey)
         return NULL_PTR_ERROR;
     }
     
-    int colIndex = columnNameToColumnIndex(db, columnName);
+    int colIndex = toColumnIndex(db, columnName);
     return IndexFind(&db->indexheads[colIndex], inKey, db->dataSizes[colIndex], NULL, 0);
 }
 
@@ -496,7 +500,7 @@ int edbDelete(EasyDB *db, void* primaryKey)
 int edbUpdate(EasyDB *db, void* primaryKey, char* updateColumnName, void* newData)
 {
     if (db == NULL || primaryKey == NULL) return NULL_PTR_ERROR;
-    long long updateColumnIndex = columnNameToColumnIndex(db, updateColumnName);
+    long long updateColumnIndex = toColumnIndex(db, updateColumnName);
     if (updateColumnIndex < 0) return COLUMN_NOT_FOUND;
 
     EDBRow *findRes = NULL;
@@ -529,14 +533,13 @@ int edbUpdate(EasyDB *db, void* primaryKey, char* updateColumnName, void* newDat
 }
 
 
-long long columnNameToColumnIndex(EasyDB *db, char *columnName)
+long long toColumnIndex(EasyDB *db, char *columnName)
 {
-    for (size_t i = 0; i < db->columnCount; i++)
+    size_t result = 0;
+    int retval = IndexFind(&db->colNameIndexHead, columnName, strlen(columnName), (void**)&result, 1);
+    if (retval > 0)
     {
-        if (!strcmp(db->columnNames[i], columnName))
-        {
-            return i;
-        }
+        return result;
     }
     return COLUMN_NOT_FOUND;
 }
@@ -566,7 +569,7 @@ void* edbGet(EasyDB *db, void* primaryKey, char* columnName)
     int retval = edbPrimaryKeyIndex(db, primaryKey, &findResult);
     if (findResult == NULL) return NULL;
 
-    long long columnIndex = columnNameToColumnIndex(db, columnName);
+    long long columnIndex = toColumnIndex(db, columnName);
     if (columnIndex < 0) return NULL;
 
     return findResult->data[columnIndex];
@@ -575,7 +578,7 @@ void* edbGet(EasyDB *db, void* primaryKey, char* columnName)
 int edbSearch(EasyDB *db, char* columnName, char *keyWord, void*** findResults, size_t maxResultNumber, size_t *resultsCount)
 {
     if (db == NULL || keyWord == NULL || findResults == NULL) return NULL_PTR_ERROR;
-    long long columnIndex = columnNameToColumnIndex(db, columnName);
+    long long columnIndex = toColumnIndex(db, columnName);
     if (columnIndex < 0) return COLUMN_NOT_FOUND;
     if (db->dataTypes[columnIndex] != EDB_TYPE_TEXT) return NOT_TEXT_COLUMN;
     
@@ -756,7 +759,7 @@ int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const 
     {
         return NULL_PTR_ERROR;
     }
-    long long colIndex = columnNameToColumnIndex(db, columnName);
+    long long colIndex = toColumnIndex(db, columnName);
     if (compareFunc == NULL)
     {
         switch (db->dataTypes[colIndex])
@@ -869,7 +872,7 @@ int easyLogin(EasyDB *db, char* userID, char* password, void*** retUserData)
     *retUserData = NULL;
     if (db == NULL || userID == NULL || password == NULL) return NULL_PTR_ERROR;
     
-    long long passwdColIndex = columnNameToColumnIndex(db, "password");
+    long long passwdColIndex = toColumnIndex(db, "password");
     if (passwdColIndex == COLUMN_NOT_FOUND) return COLUMN_NOT_FOUND;
     
     EDBRow* user = NULL;
@@ -895,7 +898,7 @@ int easyAddUser(EasyDB *db, void* newRow[])
 {
     if (db == NULL || newRow == NULL) return NULL_PTR_ERROR;
 
-    long long passwdColIndex = columnNameToColumnIndex(db, "password");
+    long long passwdColIndex = toColumnIndex(db, "password");
     if (passwdColIndex == COLUMN_NOT_FOUND) return COLUMN_NOT_FOUND;
 
     int retval = edbInsert(db, newRow);
@@ -922,7 +925,7 @@ int easyResetPassword(EasyDB *db, char* userID, char* newPassword)
 {
     if (db == NULL || userID == NULL || newPassword == NULL) return NULL_PTR_ERROR;
 
-    long long passwdColIndex = columnNameToColumnIndex(db, "password");
+    long long passwdColIndex = toColumnIndex(db, "password");
     if (passwdColIndex == COLUMN_NOT_FOUND) return COLUMN_NOT_FOUND;
 
     char newpasswd_sha256[70];
@@ -955,10 +958,18 @@ int edbImportCSV(EasyDB* db, char* csvFileName)
         newRow[i] = calloc(db->dataSizes[i], 1);
     }
     
-
+    bool isInQuot = 0;
     while (fgets(rowBuf, db->rowSize, csvFile) != NULL)
     {
         if (strchr(rowBuf, '\n')) *(strchr(rowBuf, '\n')) = 0;    // 移除换行符
+
+        for (size_t i = 0; i < strlen(rowBuf); i++)
+        {
+            if (rowBuf[i] == '\"' && isInQuot) isInQuot = 0;
+            else if (rowBuf[i] == '\"' && !isInQuot) isInQuot = 1;
+            else if (rowBuf[i] == ',' && isInQuot) rowBuf[i] = '\x1F';  // 在双引号中的逗号替换为不可见字符
+        }
+
         char* token = strtok(rowBuf, ",");  // 逗号分隔
         size_t cnt = 0;
 
@@ -978,6 +989,19 @@ int edbImportCSV(EasyDB* db, char* csvFileName)
                 sscanf(token, "%lf", newRow[cnt]);
                 break;
             case EDB_TYPE_TEXT:
+                // 替换回逗号
+                while (strchr(token, '\x1F'))
+                {
+                    *(strchr(token, '\x1F')) = ',';
+                }
+                
+                // 移除头尾双引号
+                if (token[0] == '\"' && token[strlen(token) - 1] == '\"')
+                {
+                    token[strlen(token) - 1] = 0;
+                    ++token;
+                }
+                
                 strcpy(newRow[cnt], token);
                 break;
             default:
@@ -1000,7 +1024,7 @@ int edbImportCSV(EasyDB* db, char* csvFileName)
     return SUCCESS;
 }
 
-int edbExportCSV(EasyDB* db, char* csvFileName)
+int edbExportCSV(EasyDB* db, char* csvFileName, bool withBOM)
 {
     if (db == NULL || csvFileName == NULL)
     {
@@ -1011,6 +1035,11 @@ int edbExportCSV(EasyDB* db, char* csvFileName)
     if (csvFile == NULL)
     {
         return FILE_OPEN_ERROR;
+    }
+
+    if (withBOM)    // 写入BOM标识
+    {
+        fputs("\xEF\xBB\xBF", csvFile);
     }
 
     for (size_t i = 0; i < db->columnCount - 1; i++)    // 先打出表头
@@ -1033,7 +1062,16 @@ int edbExportCSV(EasyDB* db, char* csvFileName)
                 fprintf(csvFile, "%lf,", Real(it[i]));
                 break;
             case EDB_TYPE_TEXT:
-                fputs(Text(it[i]), csvFile);
+                if (strchr(Text(it[i]), ','))   // 若含有逗号，则写入双引号
+                {
+                    fputc('\"', csvFile);
+                    fputs(Text(it[i]), csvFile);
+                    fputc('\"', csvFile);
+                }
+                else
+                {
+                    fputs(Text(it[i]), csvFile);
+                }
                 fputc(',', csvFile);
             default:
                 break;

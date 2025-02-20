@@ -35,6 +35,7 @@ const wchar_t* editColumnClassName = TEXT("EditColumnWindow");
 #define DB_LIST_VIEW 201        // 显示数据库内容的列表展示
 #define SEARCH_BOX 301          // 搜索框
 #define COLUMN_COMBOBOX 401     // 列选择组合框
+#define STATUS_BAR 501          // 状态栏
 
 #define M_BUF_SIZ 65536
 char gbk_buffer[M_BUF_SIZ];
@@ -47,6 +48,7 @@ HWND hMainWindow;
 HWND hMainListView;
 HWND hSearchBox;
 HWND hColumnNameComboBox;
+HWND hStatusBar;
 HMENU hRightClickMenu;
 EasyDB db;
 bool isEdited;              // 文件是否被被编辑
@@ -89,7 +91,7 @@ void ProcessDBListView(HWND hListView)      // 将数据库文件读取到ListVi
     for (size_t i = 0; i < db.columnCount; i++)
     {
         lvCol.pszText = utf8toutf16(db.columnNames[i], utf16_buffer, M_BUF_SIZ);
-        lvCol.cx = 150;
+        lvCol.cx = 100;
         ListView_InsertColumn(hListView, i, &lvCol);
 
         ComboBox_AddString(hColumnNameComboBox, lvCol.pszText); // 同时将列名添加到列选择框中
@@ -210,10 +212,15 @@ void OpenDBFile(HWND hListView)
         // 设置窗口标题，显示打开的文件名
         char* newTitle = (char*)calloc(strlen(appName) + strlen(edbFilename) + 10, sizeof(char));
         strcpy(newTitle, appName);
-        strcat(newTitle, "\t");
+        strcat(newTitle, "_");
         strcat(newTitle, edbFilename);
         SetWindowTextW(hMainWindow, utf8toutf16(newTitle, utf16_buffer, M_BUF_SIZ));
         free(newTitle);
+
+        // 刷新状态栏中显示的总行数
+        wchar_t sbarStr[128];
+        swprintf(sbarStr, 128, L"共%llu行", db.rowCount);
+        SendMessageW(hStatusBar, SB_SETTEXT, 2, (LPARAM)sbarStr);
     }
     
     ProcessDBListView(hListView);
@@ -1025,7 +1032,7 @@ LRESULT CALLBACK CreateDBWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         }
         else if (LOWORD(wParam) == CREATE_COMPLETE_BUTTON)  // “完成”按钮被按下
         {
-            int nFileOffset = SaveFileDialogAndProcess(hwnd, TEXT("EasyDB 文件\0*.db\0""所有文件\0*.*\0"), TEXT("另存为EasyDB文件"));
+            int nFileOffset = SaveFileDialogAndProcess(hwnd, TEXT("EasyDB 文件(*.db)\0*.db\0""所有文件\0*.*\0"), TEXT("另存为EasyDB文件"));
             strcpy(edbFilename, tmpFilename);
             CreateEDBFile(hwnd, nFileOffset);
         }
@@ -1174,14 +1181,14 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         // “导入CSV”按钮
         hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("导入CSV"),
                                     WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                                    970, 10, 60, 25, 
+                                    10, 45, 60, 25, 
                                     hwnd, (HMENU)IMPORT_CSV_BUTTON, 
                                     GetModuleHandle(NULL), NULL);
         SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
         // “导出CSV”按钮
         hButton = CreateWindowExW(0, TEXT("BUTTON"), TEXT("导出CSV"),
                                     WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                                    1040, 10, 60, 25, 
+                                    80, 45, 60, 25, 
                                     hwnd, (HMENU)EXPORT_CSV_BUTTON, 
                                     GetModuleHandle(NULL), NULL);
         SendMessageW(hButton, WM_SETFONT, (WPARAM)hFont, TRUE);
@@ -1190,14 +1197,28 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
                                         WC_LISTVIEW, 
                                         TEXT(""),
                                         WS_CHILD | WS_VISIBLE | LVS_REPORT,
-                                        10, 50, DEFAULT_WIDTH - 30, DEFAULT_HEIGHT - 60,
+                                        10, 80, DEFAULT_WIDTH - 30, DEFAULT_HEIGHT - 110,
                                         hwnd, 
                                         (HMENU)DB_LIST_VIEW,
                                         GetModuleHandle(NULL), 
                                         NULL);
+        ListView_SetExtendedListViewStyle(hMainListView, LVS_EX_FULLROWSELECT);
         // SendMessageW(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);   // 整行选中
         // SendMessageW(hMainListView, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES, LVS_EX_CHECKBOXES);         // 复选框
-        ListView_SetExtendedListViewStyle(hMainListView, LVS_EX_FULLROWSELECT);
+        
+        // 状态栏
+        hStatusBar = CreateWindowEx(0,
+                                    STATUSCLASSNAME,
+                                    (PCTSTR) NULL,
+                                    SBARS_SIZEGRIP | WS_CHILD | WS_VISIBLE,
+                                    0, DEFAULT_HEIGHT - 20, DEFAULT_WIDTH, 20,
+                                    hwnd, 
+                                    (HMENU)STATUS_BAR,
+                                    GetModuleHandle(NULL),
+                                    NULL);
+        // 设置状态栏的多个部件
+        int parts[] = {DEFAULT_WIDTH - 300, DEFAULT_WIDTH - 150, -1};  // -1为自动填充
+        SendMessageW(hStatusBar, SB_SETPARTS, ARRAYSIZE(parts), (LPARAM)parts);
         // 右键菜单
         hRightClickMenu = CreatePopupMenu();
         break;
@@ -1224,7 +1245,7 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         }
         case OPEN_FILE_BUTTON:     // “打开”按钮被按下
         {
-            OpenFileDialogAndProcess(hwnd, TEXT("EasyDB 文件\0*.db\0""所有文件\0*.*\0"), TEXT("打开EasyDB文件"));
+            OpenFileDialogAndProcess(hwnd, TEXT("EasyDB 文件(*.db)\0*.db\0""所有文件\0*.*\0"), TEXT("打开EasyDB文件"));
             strcpy(edbFilename, tmpFilename);
             OpenDBFile(hMainListView);
             break;
@@ -1307,7 +1328,7 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             {
                 SaveFileDialogAndProcess(hwnd, TEXT("CSV(UTF-8) 逗号分隔文件(*.csv)\0*.csv\0""所有文件\0*.*\0"), TEXT("导出CSV"));
                 strcpy(csvFilename, tmpFilename);
-                edbExportCSV(&db, utf8togbk(csvFilename, gbk_buffer, M_BUF_SIZ));
+                edbExportCSV(&db, utf8togbk(csvFilename, gbk_buffer, M_BUF_SIZ), TRUE);
             }
             break;
         }
@@ -1359,12 +1380,20 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             break;
         }
         }
+        
+        // 刷新状态栏中显示的总行数
+        wchar_t sbarStr[128];
+        swprintf(sbarStr, 128, L"共%llu行", db.rowCount);
+        SendMessageW(hStatusBar, SB_SETTEXT, 2, (LPARAM)sbarStr);
         break;
     }
     case WM_NOTIFY: {                                           // 处理点击表头，进行排序
-        LPNMLISTVIEW lpnmh = (LPNMLISTVIEW)lParam;
-        if (((LPNMHDR)lParam)->code == LVN_COLUMNCLICK) 
+        switch (((LPNMHDR)lParam)->code)
         {
+        case LVN_COLUMNCLICK:
+        {
+            LPNMLISTVIEW lpnmh = (LPNMLISTVIEW)lParam;
+
             // 获取点击的列
             int clickedColumn = lpnmh->iSubItem;
             
@@ -1378,6 +1407,15 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
                     ProcessDBListView(hMainListView);
                 }
             }
+        }
+        case LVN_ITEMCHANGED:
+        {
+            // 刷新状态栏中显示的正在选中的行
+            LPNMLISTVIEW lpnmh = (LPNMLISTVIEW)lParam;
+            wchar_t sbarStr[128];
+            swprintf(sbarStr, 128, L"第%d行", lpnmh->iItem + 1);
+            SendMessageW(hStatusBar, SB_SETTEXT, 1, (LPARAM)sbarStr); 
+        }
         }
         break;
     }
@@ -1410,10 +1448,7 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     }
     case WM_KEYDOWN:{       // 试图处理TAB键
         HWND focus = GetFocus();
-        if (focus == hMainListView)
-        {
-            break;
-        }
+        if (focus == hMainListView) break;
         else
         {
             if (addingEditBoxes)
@@ -1443,7 +1478,13 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     {
         int newWidth = LOWORD(lParam);
         int newHeight = HIWORD(lParam);
-        MoveWindow(hMainListView, 10, 40, newWidth - 30, newHeight - 60, TRUE);     // 修改ListView的大小
+        MoveWindow(hMainListView, 10, 80, newWidth - 30, newHeight - 110, TRUE);    // 修改ListView的大小
+        MoveWindow(hStatusBar, 0, newHeight - 20, newWidth, 20, TRUE);              // 修改状态栏的位置
+
+        // 调整状态栏的部件
+        int parts[] = {newWidth - 300, newWidth - 150, -1};  // -1为自动填充
+        SendMessageW(hStatusBar, SB_SETPARTS, ARRAYSIZE(parts), (LPARAM)parts);
+
         InvalidateRect(hwnd, NULL, TRUE);  // 强制重绘窗口
         break;
     }
