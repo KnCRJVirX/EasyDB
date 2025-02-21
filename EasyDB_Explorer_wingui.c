@@ -1579,7 +1579,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     InitCommonControls();
 
     // 启用 Windows 视觉样式
-    EnableThemeDialogTexture(hMainListView, ETDT_ENABLE);
+    EnableThemeDialogTexture(hMainWindow, ETDT_ENABLE);
 
     // 初始化 Common Controls 库
     InitCommonControls();
