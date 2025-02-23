@@ -153,7 +153,7 @@ void OpenDBFile(HWND hListView)
 {
     if (db.dbfilename && isEdited)
     {
-        int result = MessageBox(hListView, TEXT("是否保存文件并打开新文件？"), TEXT("打开新文件"), MB_YESNOCANCEL);
+        int result = MessageBoxW(hListView, TEXT("是否保存文件并打开新文件？"), TEXT("打开新文件"), MB_YESNOCANCEL | MB_ICONASTERISK);
         if (result == IDYES)
         {
             ClearLV_CB_RCMenu(hListView, db.columnCount);
@@ -862,7 +862,7 @@ void CreateEDBFile(HWND hwnd, int nFileOffset)
     }
     else
     {
-        MessageBoxW(hwnd, TEXT("创建数据库失败！"), NULL, MB_OK);
+        MessageBoxW(hwnd, TEXT("创建数据库失败！"), NULL, MB_OK | MB_ICONEXCLAMATION);
     }
 }
 LRESULT CALLBACK CreateDBWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -1507,7 +1507,7 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             break;
         }
         
-        int result = MessageBox(hwnd, TEXT("是否保存文件并退出？"), TEXT("退出"), MB_YESNOCANCEL);
+        int result = MessageBoxW(hwnd, TEXT("是否保存文件并退出？"), TEXT("退出"), MB_YESNOCANCEL | MB_ICONASTERISK);
         if (result == IDYES)
         {
             edbClose(&db);
@@ -1561,14 +1561,14 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
     // 创建窗口
     hMainWindow = CreateWindowExW(WS_EX_ACCEPTFILES ,    // 可拖入文件
-                                mainClassName, 
-                                utf8toutf16(appName, utf16_buffer, M_BUF_SIZ), 
-                                WS_OVERLAPPEDWINDOW, 
-                                CW_USEDEFAULT, CW_USEDEFAULT, 
-                                DEFAULT_WIDTH, DEFAULT_HEIGHT, 
-                                NULL, NULL, 
-                                mainwc.hInstance,
-                                NULL);
+                                    mainClassName, 
+                                    utf8toutf16(appName, utf16_buffer, M_BUF_SIZ), 
+                                    WS_OVERLAPPEDWINDOW, 
+                                    CW_USEDEFAULT, CW_USEDEFAULT, 
+                                    DEFAULT_WIDTH, DEFAULT_HEIGHT, 
+                                    NULL, NULL, 
+                                    mainwc.hInstance,
+                                    NULL);
 
     
     // 显示窗口

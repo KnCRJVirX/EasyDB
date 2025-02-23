@@ -24,8 +24,8 @@ int edbCreate(const char* filename, const char* tableName, size_t columnCount, c
     int ver = EDB_VERSION;
     fwrite(&ver, 4, 1, dbfile);
 
-    size_t emptyLineCount = 0;
-    fwrite(&emptyLineCount, EDB_INT_SIZE, 1, dbfile);
+    size_t emptyRowCount = 0;
+    fwrite(&emptyRowCount, EDB_INT_SIZE, 1, dbfile);
 
     size_t rowSize = 0;
     for (size_t i = 0; i < columnCount; i++)
@@ -303,15 +303,29 @@ int edbClose(EasyDB *db)
 int edbSave(EasyDB *db)
 {
     if (db == NULL) return NULL_PTR_ERROR;
-    
-    char* fileHead = (char*)calloc(db->dataFileOffset + 10, sizeof(char));
-    FILE* dbfileReadHead = fopen(db->dbfilename, "rb+");
-    fread(fileHead, 1, db->dataFileOffset, dbfileReadHead);
-    *(size_t*)&fileHead[4 + 4] = db->rowCount;
-    fclose(dbfileReadHead);
 
     FILE* dbfile = fopen(db->dbfilename, "wb+");
-    fwrite(fileHead, 1, db->dataFileOffset, dbfile);
+
+    // 写文件头
+    int magicNum = EDB_MAGIC_NUMBER;
+    fwrite(&magicNum, 4, 1, dbfile);
+    fwrite(&db->version, 4, 1, dbfile);
+    fwrite(&db->rowCount, 8, 1, dbfile);
+    fwrite(&db->rowSize, 8, 1, dbfile);
+    fwrite(&db->columnCount, 8, 1, dbfile);
+    fwrite(db->dataTypes, 8, db->columnCount, dbfile);
+    fwrite(db->dataSizes, 8, db->columnCount, dbfile);
+    for (size_t i = 0; i < db->columnCount; i++)
+    {
+        fwrite(db->columnNames[i], 1, strlen(db->columnNames[i]) + 1, dbfile);
+    }
+    if (db->version >= 1)
+    {
+        fwrite(db->tableName, 1, strlen(db->tableName) + 1, dbfile);
+    }
+    fwrite(&db->primaryKeyIndex, 8, 1, dbfile);
+
+    // 记录内容
     EDBRow* ptr = db->head->next;
     for (size_t i = 0; i < db->rowCount && ptr != db->tail; i++)
     {
@@ -322,7 +336,6 @@ int edbSave(EasyDB *db)
         ptr = ptr->next;
     }
     fclose(dbfile);
-    free(fileHead);
     return SUCCESS;
 }
 
