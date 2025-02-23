@@ -772,6 +772,11 @@ int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const 
     {
         return NULL_PTR_ERROR;
     }
+    if (db->rowCount == 0)
+    {
+        return EMPTY_TABLE;
+    }
+    
     long long colIndex = toColumnIndex(db, columnName);
     if (compareFunc == NULL)
     {
