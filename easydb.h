@@ -107,7 +107,7 @@ int edbWhere(EasyDB *db, char* columnName, void* inKey, void*** findResults, siz
 int edbUpdate(EasyDB *db, void* primaryKey, char* updateColumnName, void* newData);                                                 //修改
 
 /*便利API*/
-long long toColumnIndex(EasyDB *db, char *columnName);                                                                    //将列名转换为列索引
+long long toColumnIndex(EasyDB *db, char *columnName);                                                                              //将列名转换为列索引
 void** edbIterBegin(EasyDB *db);                                                                                                    //数据库遍历（返回一个指向第一行数据的指针）
 void** edbIterNext(EasyDB *db);                                                                                                     //返回指向下一行数据的指针
 void* edbGet(EasyDB *db, void* primaryKey, char* columnName);

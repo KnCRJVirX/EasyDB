@@ -627,9 +627,11 @@ int edbDeleteByKeyword(EasyDB *db, char* columnName, char *keyword)
 
     void** searchResults[1000];
     size_t resultsCount = 0;
+    int retval = 0;
     while (1)
     {
-        edbSearch(db, columnName, keyword, searchResults, 1000, &resultsCount);
+        retval = edbSearch(db, columnName, keyword, searchResults, 1000, &resultsCount);
+        if (retval != SUCCESS) return retval;
         if (resultsCount <= 0) break;
         edbDeleteByArray(db, searchResults, resultsCount);
     }
@@ -642,46 +644,15 @@ int edbDeleteByKey(EasyDB *db, char* columnName, void* inKey)
 
     void** findReshults[1000];
     size_t resultsCount = 0;
+    int retval = 0;
     while (1)
     {
-        edbWhere(db, columnName, inKey, findReshults, 1000, &resultsCount);
+        retval = edbWhere(db, columnName, inKey, findReshults, 1000, &resultsCount);
+        if (retval != SUCCESS) return retval;
         if (resultsCount <= 0) break;
         edbDeleteByArray(db, findReshults, resultsCount);
     }
     return SUCCESS;
-}
-
-void swapNode(EDBRow* a, EDBRow* b)
-{
-    if (a->next == b && b->prev == a)
-    {
-        EDBRow *pre_a = a->prev;
-        EDBRow *next_b = b->next;
-
-        pre_a->next = b;
-        b->prev = pre_a;
-        b->next = a;
-        a->prev = b;
-        a->next = next_b;
-        next_b->prev = a;
-    }
-    else
-    {
-        EDBRow *pre_a = a->prev;
-        EDBRow *pre_b = b->prev;
-        EDBRow *next_a = a->next;
-        EDBRow *next_b = b->next;
-
-        pre_a->next = b;
-        b->prev = pre_a;
-        pre_b->next = a;
-        a->prev = pre_b;
-
-        a->next = next_b;
-        next_b->prev = a;
-        b->next = next_a;
-        next_a->prev = b;
-    }
 }
 
 int edbDefaultCompareInts(const void *a, const void *b){return *(int*)a - *(int*)b;}
@@ -790,6 +761,7 @@ int edbSort(EasyDB *db, char* columnName, int (*compareFunc)(const void*, const 
             break;
         case EDB_TYPE_TEXT:
             compareFunc = (int(*)(const void *, const void *))strcmp;
+            break;
         default:
             break;
         }

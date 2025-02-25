@@ -1383,7 +1383,7 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         
         // 刷新状态栏中显示的总行数
         wchar_t sbarStr[128];
-        swprintf(sbarStr, 128, L"共%llu行", db.rowCount);
+        swprintf(sbarStr, 128, L"共%llu行", ListView_GetItemCount(hMainListView));
         SendMessageW(hStatusBar, SB_SETTEXT, 2, (LPARAM)sbarStr);
         break;
     }
