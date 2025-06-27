@@ -2,3 +2,5 @@ try.c
 *.exe
 *.db
 PerformanceBench/
+.vscode
+build

@@ -84,7 +84,9 @@ int main(int argc, char const *argv[])
         else if (!strcmp(command, "userlist"))
         {
             printf("UserID | password | VIP Level\n");
-            for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))
+            void* eIterator = edbIterBegin(&db);
+            void** it = NULL;
+            while (it = edbIterNext(&db, &eIterator))
             {
                 printf("%s | %s | %d\n", it[0], it[1], Int(it[2]));
             }

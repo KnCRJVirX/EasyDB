@@ -1,6 +1,10 @@
 #define UNICODE
 #define _UNICODE
 
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -106,7 +110,9 @@ void ProcessDBListView(HWND hListView)      // 将数据库文件读取到ListVi
     size_t cnt = 0;
     LV_ITEM lvItem;
     lvItem.mask = LVIF_TEXT;                // 需要指定显示的字符
-    for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))
+    void* eIterator = edbIterBegin(&db);
+    void** it = NULL;
+    while (it = edbIterNext(&db, &eIterator))
     {
         lvItem.iItem = cnt++;
         for (size_t i = 0; i < db.columnCount; i++)
@@ -318,8 +324,6 @@ void AddNewStart_SetEdit(HWND hListView)  // 开始添加
         
         // 设置字体
         SendMessageW(addingEditBoxes[i], WM_SETFONT, (WPARAM)hFont, TRUE);
-        // 设置编辑框的 Z 顺序 确保编辑框位于 ListView 的上方，避免被 ListView 覆盖。
-        // SetWindowPos(addingEditBoxes[i], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     }
 }
 

@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
-#include "index.h"
 
 #ifndef EASYDB
 #define EASYDB
@@ -71,12 +70,10 @@ typedef struct EasyDatabase
 }EasyDatabase;
 typedef EasyDatabase EasyDB;
 
-
 /*便利宏*/
 #define Int(x) (*(edb_int*)(x))   //将返回的void指针转换为整数指针并解引用
 #define Real(x) (*(double*)(x))   //将返回的void指针转换为浮点数指针并解引用
 #define Text(x) ((char*)(x))      //将返回的void指针转换为字符指针
-#define EDB_ITER(db, iter_ptr) for((iter_ptr) = edbIterBegin(&(db)); (iter_ptr) != NULL; (iter_ptr) = edbIterNext(&(db)))
 
 /*内部API*/
 int edbPrimaryKeyIndex(EasyDB *db, void* primaryKey, EDBRow** indexResult);
@@ -108,8 +105,8 @@ int edbUpdate(EasyDB *db, void* primaryKey, char* updateColumnName, void* newDat
 
 /*便利API*/
 long long toColumnIndex(EasyDB *db, char *columnName);                                                                              //将列名转换为列索引
-void** edbIterBegin(EasyDB *db);                                                                                                    //数据库遍历（返回一个指向第一行数据的指针）
-void** edbIterNext(EasyDB *db);                                                                                                     //返回指向下一行数据的指针
+void* edbIterBegin(EasyDB *db);                                                                                                     //数据库遍历（返回迭代器）
+void** edbIterNext(EasyDB *db, void** pEdbIterator);                                                                                //返回指向下一行数据的指针
 void* edbGet(EasyDB *db, void* primaryKey, char* columnName);
 int edbSearch(EasyDB *db, char* columnName, char *keyWord, void*** findResults, size_t maxResultNumber, size_t *resultsCount);      //数据库文本搜索（慢）
 int edbDeleteByArray(EasyDB *db, void** deleteRows[], size_t arraySize);                                                            //使用搜索得到的数组删除
@@ -129,5 +126,32 @@ int easyDeleteUser(EasyDB *db, char* userID);                                   
 int easyResetPassword(EasyDB *db, char* userID, char* newPassword);                                                                 //重置用户密码
 char* uuid(char *UUID);                                                                                                             //生成UUID v4
 char* sha256(const char* input, char* SHA256);                                                                                      //对输入的字符串进行sha256摘要
+
+
+#ifndef INDEX
+#define INDEX
+#include "uthash.h"
+#define NODE_NOT_EXIST -1
+
+typedef struct SetNode
+{
+    void* data;
+    UT_hash_handle hh;
+}SetNode;
+
+typedef struct IndexNode
+{
+    void* key;
+    size_t keyLenth;
+    SetNode* setHead;
+    UT_hash_handle hh;
+}IndexNode;
+
+
+int IndexInsert(IndexNode** head, void* inKey, size_t keyLenth, void* data);
+size_t IndexFind(IndexNode** head, void* inKey, size_t keyLenth, void** findResults, size_t len);
+int IndexDel(IndexNode** head, void* inKey, size_t keyLenth, void* data_ptr);
+int IndexClear(IndexNode** head);
+#endif
 
 #endif

@@ -1,5 +1,8 @@
 #include "easydb.h"
-#include "index.h"
+
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 
 int edbCreate(const char* filename, const char* tableName, size_t columnCount, char* primaryKeyColumnName, size_t dataTypes[], size_t dataSizes[], char* columnNames[])
 {
@@ -557,21 +560,20 @@ long long toColumnIndex(EasyDB *db, char *columnName)
     return COLUMN_NOT_FOUND;
 }
 
-void** edbIterBegin(EasyDB *db)
+void* edbIterBegin(EasyDB *db)
 {
     if (db->rowCount == 0 || db->head == NULL || db->head == db->tail) return NULL;
 
     EDBRow *ptr = db->head->next;
-    db->tmpptr = ptr;
-    return ptr->data;
+    return ptr;
 }
 
-void** edbIterNext(EasyDB *db)
+void** edbIterNext(EasyDB *db, void** pEdbIterator)
 {
-    if (db->tmpptr->next == db->tail) return NULL;
+    if (((EDBRow*)(*pEdbIterator))->next == db->tail) return NULL;
     
-    db->tmpptr = db->tmpptr->next;
-    return db->tmpptr->data;
+    *pEdbIterator = ((EDBRow*)(*pEdbIterator))->next;
+    return ((EDBRow*)(*pEdbIterator))->data;
 }
 
 void* edbGet(EasyDB *db, void* primaryKey, char* columnName)
@@ -596,7 +598,9 @@ int edbSearch(EasyDB *db, char* columnName, char *keyWord, void*** findResults, 
     if (db->dataTypes[columnIndex] != EDB_TYPE_TEXT) return NOT_TEXT_COLUMN;
     
     size_t curResultsCount = 0;
-    for (void** it = edbIterBegin(db); it != NULL; it = edbIterNext(db))
+    void* eIterator = edbIterBegin(db);
+    void** it = NULL;
+    while (it = edbIterNext(db, &eIterator))
     {
         if (strstr((char*)it[columnIndex], keyWord))
         {
@@ -1038,7 +1042,9 @@ int edbExportCSV(EasyDB* db, char* csvFileName, bool withBOM)
     }
     fprintf(csvFile, "%s\n", db->columnNames[db->columnCount - 1]);
 
-    for (void** it = edbIterBegin(db); it != NULL; it = edbIterNext(db))
+    void* eIterator = edbIterBegin(db);
+    void** it = NULL;
+    while (it = edbIterNext(db, &eIterator))
     {
         size_t i;
         for (i = 0; i < db->columnCount - 1; i++)
@@ -1086,4 +1092,109 @@ int edbExportCSV(EasyDB* db, char* csvFileName, bool withBOM)
     
     fclose(csvFile);
     return SUCCESS;
+}
+
+// 以下为索引模块
+int IndexInsert(IndexNode** head, void* inKey, size_t keyLenth, void* data)
+{
+    SetNode* newSetNode = (SetNode*)malloc(sizeof(SetNode));
+    newSetNode->data = data;
+    IndexNode* findNode = NULL;
+    HASH_FIND(hh, *head, inKey, keyLenth, findNode);
+    if (findNode == NULL)
+    {
+        IndexNode* newIndexNode = (IndexNode*)malloc(sizeof(IndexNode));
+
+        // 将键的内容拷一份过来，避免该键对应的节点被释放后，其他相同键的节点无法索引
+        newIndexNode->key = calloc(keyLenth + 2, 1);
+        memcpy(newIndexNode->key, inKey, keyLenth);
+
+        newIndexNode->keyLenth = keyLenth;
+        newIndexNode->setHead = NULL;
+        
+        HASH_ADD_KEYPTR(hh, newIndexNode->setHead, &newSetNode->data, sizeof(void*), newSetNode);
+        HASH_ADD_KEYPTR(hh, *head, newIndexNode->key, newIndexNode->keyLenth, newIndexNode);
+    }
+    else
+    {
+        HASH_ADD_KEYPTR(hh, findNode->setHead, &newSetNode->data, sizeof(void*), newSetNode);
+    }
+    return 0;
+}
+
+size_t IndexFind(IndexNode** head, void* inKey, size_t keyLenth, void** findResults, size_t len)
+{
+    IndexNode* findNode = NULL;
+
+    HASH_FIND(hh, *head, inKey, keyLenth, findNode);
+    size_t count = 0;
+    if (findNode == NULL)
+    {
+        return 0;
+    }
+    else
+    {
+        if (findResults == NULL || len == 0)
+        {
+            return HASH_COUNT(findNode->setHead);
+        }
+        SetNode *ptr1 = NULL, *ptr2 = NULL;
+        HASH_ITER(hh, findNode->setHead, ptr1, ptr2){
+            if (count >= len) return count;
+            findResults[count] = ptr1->data;
+            ++count;
+        }
+        return count;
+    }
+    return 0;
+}
+
+int IndexDel(IndexNode** head, void* inKey, size_t keyLenth, void* data_ptr)
+{
+    IndexNode* findNode = NULL;
+    HASH_FIND(hh, *head, inKey, keyLenth, findNode);
+    if (findNode == NULL)
+    {
+        return NODE_NOT_EXIST;
+    }
+    else
+    {
+        SetNode* findSetNode = NULL;
+        HASH_FIND(hh, findNode->setHead, &data_ptr, sizeof(data_ptr), findSetNode);
+        if (findSetNode == NULL)
+        {
+            return NODE_NOT_EXIST;
+        }
+        else
+        {
+            HASH_DEL(findNode->setHead, findSetNode);
+            free(findSetNode);
+        }
+
+        // 若该键已经没有节点，则删除
+        if (HASH_COUNT(findNode->setHead) == 0)
+        {
+            HASH_DEL(*head, findNode);
+            free(findNode->key);
+            free(findNode);
+        }
+    }
+    
+    return 0;
+}
+
+int IndexClear(IndexNode** head)
+{
+    IndexNode *ptr1, *ptr2;
+    HASH_ITER(hh, *head, ptr1, ptr2){
+        SetNode *ptr3 = NULL, *ptr4 = NULL;
+        HASH_ITER(hh, ptr1->setHead, ptr3, ptr4){
+            HASH_DEL(ptr1->setHead, ptr3);
+            free(ptr3);
+        }
+        HASH_DEL(*head, ptr1);
+        free(ptr1->key);
+        free(ptr1);
+    }
+    return 0;
 }

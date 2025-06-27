@@ -54,7 +54,9 @@ int main(int argc, char const *argv[])
         else if (!strcmp(command, "show"))
         {
             printf("%s\t\t%s\t\t%s\n", db.columnNames[0], db.columnNames[1], db.columnNames[2]);
-            for (void** it = edbIterBegin(&db); it != NULL; it = edbIterNext(&db))      //遍历打印测试数据
+            void* eIterator = edbIterBegin(&db);
+            void** it = NULL;
+            while (it = edbIterNext(&db, &eIterator))
             {
                 printf("%-15d\t%-15s\t%lf\n", Int(it[0]), it[1], Real(it[2]));
             }
