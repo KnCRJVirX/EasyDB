@@ -1,5 +1,9 @@
 #include "easydb.h"
 
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 int edbCreate(const char* filename, const char* tableName, size_t columnCount, char* primaryKeyColumnName, size_t dataTypes[], size_t dataSizes[], char* columnNames[])
 {
     if (filename == NULL) return NULL_PTR_ERROR;
@@ -566,6 +570,7 @@ void* edbIterBegin(EasyDB *db)
 
 void** edbIterNext(EasyDB *db, void** pEdbIterator)
 {
+    if (*pEdbIterator == NULL) return NULL;
     if (((EDBRow*)(*pEdbIterator))->next == db->tail) return NULL;
     
     *pEdbIterator = ((EDBRow*)(*pEdbIterator))->next;

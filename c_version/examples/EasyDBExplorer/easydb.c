@@ -570,6 +570,7 @@ void* edbIterBegin(EasyDB *db)
 
 void** edbIterNext(EasyDB *db, void** pEdbIterator)
 {
+    if (*pEdbIterator == NULL) return NULL;
     if (((EDBRow*)(*pEdbIterator))->next == db->tail) return NULL;
     
     *pEdbIterator = ((EDBRow*)(*pEdbIterator))->next;
