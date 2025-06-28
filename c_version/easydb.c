@@ -570,10 +570,11 @@ void* edbIterBegin(EasyDB *db)
 void** edbIterNext(EasyDB *db, void** pEdbIterator)
 {
     if (*pEdbIterator == NULL) return NULL;
-    if (((EDBRow*)(*pEdbIterator))->next == db->tail) return NULL;
+    if (*pEdbIterator == db->tail) return NULL;
     
+    void** ret = ((EDBRow*)(*pEdbIterator))->data;
     *pEdbIterator = ((EDBRow*)(*pEdbIterator))->next;
-    return ((EDBRow*)(*pEdbIterator))->data;
+    return ret;
 }
 
 void* edbGet(EasyDB *db, void* primaryKey, char* columnName)

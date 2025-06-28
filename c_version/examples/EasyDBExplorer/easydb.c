@@ -58,8 +58,7 @@ int edbCreate(const char* filename, const char* tableName, size_t columnCount, c
     fwrite(&columnCount, EDB_INT_SIZE, 1, dbfile);
     fwrite(dataTypes, EDB_INT_SIZE, columnCount, dbfile);
     fwrite(dataSizes, EDB_INT_SIZE, columnCount, dbfile);
-    for (size_t i = 0; i < columnCount; i++)
-    {
+    for (size_t i = 0; i < columnCount; i++) {
         fwrite(columnNames[i], sizeof(char), strlen(columnNames[i]) + 1, dbfile); //+1是为了把结束符也写入文件
     }
     fwrite(tableName, sizeof(char), strlen(tableName) + 1, dbfile);
@@ -571,10 +570,11 @@ void* edbIterBegin(EasyDB *db)
 void** edbIterNext(EasyDB *db, void** pEdbIterator)
 {
     if (*pEdbIterator == NULL) return NULL;
-    if (((EDBRow*)(*pEdbIterator))->next == db->tail) return NULL;
+    if (*pEdbIterator == db->tail) return NULL;
     
+    void** ret = ((EDBRow*)(*pEdbIterator))->data;
     *pEdbIterator = ((EDBRow*)(*pEdbIterator))->next;
-    return ((EDBRow*)(*pEdbIterator))->data;
+    return ret;
 }
 
 void* edbGet(EasyDB *db, void* primaryKey, char* columnName)

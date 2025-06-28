@@ -1308,8 +1308,7 @@ LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         }
         case SEARCH_BUTTON:        // “搜索”按钮被按下
         {
-            if (db.dbfilename)
-            {
+            if (db.dbfilename) {
                 SearchButtonPressed(hMainListView, hSearchBox);
             }
             break;
