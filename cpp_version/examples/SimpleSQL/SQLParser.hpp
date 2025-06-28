@@ -260,7 +260,7 @@ namespace SQLParser
     
         Token nextToken() {
             skipWhitespace();
-            if (pos >= sql.size()) return {TokenType::END, ""};
+            if (pos >= sql.size() || sql[pos] == ';') return {TokenType::END, ""};
 
             char ch = sql[pos];
     
@@ -370,7 +370,11 @@ namespace SQLParser
             while (current.type == TokenType::IDENTIFIER) {
                 stmt->columns.emplace_back(current.value);
                 nextToken();
-                if (current.value == ",") nextToken();
+                if (current.value == ",") {
+                    nextToken();
+                } else if (current.value != ",") {
+                    break;
+                }
             }
             // 列为通配符时
             if (current.type == TokenType::SYMBOL && current.value == "*")
@@ -400,9 +404,13 @@ namespace SQLParser
             }
             
     
-            if (current.value == "WHERE") {
+            if (current.type == TokenType::KEYWORD || current.value == "WHERE") {
                 nextToken();
                 stmt->where = parseExpression();
+            }
+
+            if (current.type != TokenType::END) {
+                throw std::runtime_error("Unexpected " + current.value);
             }
     
             return stmt;

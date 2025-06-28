@@ -10,8 +10,8 @@ endif()
 if(MSVC)
     add_compile_options(/source-charset:utf-8)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
-elseif(GNU)
-    add_compile_options(-mwindows)
+elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_EXE_LINKER_FLAGS "-mwindows")
 endif()
 
 # EasyDB

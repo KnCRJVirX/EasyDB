@@ -12,6 +12,7 @@
 #include <memory>
 #include <stdexcept>
 #include <algorithm>
+
 #include <stdint.h>
 
 #define EDB_MAGIC_NUMBER 0xDBCEEA00     //魔数
@@ -45,10 +46,10 @@
 #define UNKNOWN_ERROR -17                   //未知错误
 #define TOO_LONG_DATA -18                   //数据长度超过预设
 
-#define CHECK_INIT(pEasyDB) if((pEasyDB)->is_init())
-#define CHECK_NOT_INIT(pEasyDB) if(!((pEasyDB)->is_init()))
-#define CHECK_NOT_INIT_RETURN_ERR_CODE do {CHECK_NOT_INIT(this) return NOT_INITED;} while(0);
-#define CHECK_NOT_INIT_THROW_ERROR(ERR_STRING) do {CHECK_NOT_INIT(this) throw std::logic_error((ERR_STRING));} while(0)
+#define IF_INIT(pEasyDB) if((pEasyDB)->is_init())
+#define IF_NOT_INIT(pEasyDB) if(!((pEasyDB)->is_init()))
+#define IF_NOT_INIT_RETURN_ERR_CODE do {IF_NOT_INIT(this) return NOT_INITED;} while(0);
+#define IF_NOT_INIT_THROW_ERROR(ERR_STRING) do {IF_NOT_INIT(this) throw std::logic_error((ERR_STRING));} while(0)
 
 #define IF_DATA_TYPE_NOT_MATCH(COLINDEX, DATAREF) if ((this->dataTypes[(COLINDEX)] == EDB::DataType::INT && (DATAREF).index() != 0) || \
                                                         (this->dataTypes[(COLINDEX)] == EDB::DataType::REAL&& (DATAREF).index() != 1) || \
@@ -59,7 +60,7 @@
 
 namespace EDB
 {
-    using Int = long long;
+    using Int = int64_t;
     using Real = double;
     using Text = std::string;
     using Blob = std::shared_ptr<char[]>;
@@ -67,6 +68,7 @@ namespace EDB
 
     enum class DataType : int64_t
     {
+        ILLEGAL_TYPE = -1,
         INT = 0,
         REAL = 1,
         BLOB = 2,
@@ -81,25 +83,29 @@ namespace EDB
         }
     };
 
+    static inline DataType GetDataType(const Data& data)
+    {
+        switch (data.index())
+        {
+        case 0:     return DataType::INT;
+        case 1:     return DataType::REAL;
+        case 2:     return DataType::TEXT;
+        case 3:     return DataType::BLOB;
+        default:    break;
+        }
+        return DataType::ILLEGAL_TYPE;
+    }
+
     static inline const char* DataTypeEnum2String(DataType dType)
     {
         switch (dType)
         {
-        case DataType::INT:
-            return "INT";
-            break;
-        case DataType::REAL:
-            return "REAL";
-            break;
-        case DataType::TEXT:
-            return "TEXT";
-            break;
-        case DataType::BLOB:
-            return "BLOB";
-            break;
-        default:
-            return "UNKNOWN TYPE";
-            break;
+        case DataType::ILLEGAL_TYPE:    return "ILLEGAL_TYPE";
+        case DataType::INT:             return "INT";
+        case DataType::REAL:            return "REAL";
+        case DataType::TEXT:            return "TEXT";
+        case DataType::BLOB:            return "BLOB";
+        default:                        break;
         }
         return "UNKNOWN TYPE";
     }
@@ -180,8 +186,10 @@ namespace EDB
     };
 
     // 行视图
+    class EasyDB;
     class ERowView
     {
+        friend class EasyDB;
     public:
         // 元素类型及可转换类型
         using DataType = Data;
@@ -386,7 +394,7 @@ namespace EDB
         }
         ~EasyDB()
         {
-            CHECK_INIT(this)
+            IF_INIT(this)
             {
                 this->closeNotSave();
             }
@@ -397,7 +405,7 @@ namespace EDB
             {
                 throw std::logic_error("EasyDB::EasyDB(const EasyDB& other): EasyDB object can not be constructed from another uninitialized object.");
             }
-            CHECK_INIT(this)
+            IF_INIT(this)
             { this->close(); }
             init = true;
             dbfilename = other.dbfilename;
@@ -422,7 +430,7 @@ namespace EDB
             {
                 throw std::logic_error("EasyDB::EasyDB(const EasyDB& other): EasyDB object can not be constructed from another uninitialized object.");
             }
-            CHECK_INIT(this)
+            IF_INIT(this)
             { this->close(); }
             init = true;
             dbfilename = other.dbfilename;
@@ -526,7 +534,7 @@ namespace EDB
         }
         int open(const std::string& dbFilePath)
         {
-            CHECK_INIT(this) this->close();
+            IF_INIT(this) this->close();
             this->dbfilename = dbFilePath;
             std::ifstream dbfile;
             dbfile.open(this->dbfilename, std::ios::in | std::ios::binary);
@@ -634,7 +642,7 @@ namespace EDB
         }
         int closeNotSave()
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             this->dbfilename.clear();
             this->dataOffset.clear();
             this->dataTypes.clear();
@@ -647,7 +655,7 @@ namespace EDB
         }
         int save()
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             std::ofstream dbfile;
             dbfile.open(this->dbfilename, std::ios::out | std::ios::binary);
             if (dbfile.fail() || !dbfile.is_open())
@@ -726,7 +734,7 @@ namespace EDB
         // 基础操作（STL兼容）
         int insert(const std::unordered_map<std::string, Data>& row)
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             if (row.find(this->columnNames[this->primaryKeyIndex]) == row.end())
             { return INVALID_ROW; }
             if (this->table.find(row.at(this->columnNames[this->primaryKeyIndex])) != this->table.end())
@@ -770,7 +778,7 @@ namespace EDB
         }
         int insert(const std::vector<Data>& row)
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             if (row.size() != this->columnCount)
             {
                 return INVALID_ROW;
@@ -794,7 +802,7 @@ namespace EDB
         }
         int erase(const Data& primaryKey)
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             IF_DATA_TYPE_NOT_MATCH(this->primaryKeyIndex, primaryKey)
             { return DATA_TYPE_NOT_MATCH; }
             if (this->table.find(primaryKey) == this->table.end())
@@ -810,7 +818,7 @@ namespace EDB
         }
         int update(const Data& primaryKey, int columnIndex, const Data& newData)
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             if (columnIndex < 0 || columnIndex >= this->columnCount)
             { return COLUMN_INDEX_OUT_OF_RANGE; }
             IF_DATA_TYPE_NOT_MATCH(this->primaryKeyIndex, primaryKey)
@@ -825,7 +833,7 @@ namespace EDB
         }
         int update(const Data& primaryKey, const std::string& columnName, const Data& newData)
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             int colIndex = this->toColumnIndex(columnName);
             if (colIndex < 0)
             { return COLUMN_NOT_FOUND; }
@@ -848,14 +856,14 @@ namespace EDB
         }
         RowViewType at(const Data& primaryKey)
         {
-            CHECK_NOT_INIT_THROW_ERROR("EasyDB::at(const Data& primaryKey) : Not inited!");
+            IF_NOT_INIT_THROW_ERROR("EasyDB::at(const Data& primaryKey) : Not inited!");
             if (this->table.find(primaryKey) == this->table.end())
             { throw std::logic_error("EasyDB::at(const Data& primaryKey) : Key not found!"); }
             return EDB::EasyDB::RowViewType{table[primaryKey], this->columnIndexMap};
         }
         const Data& at(const Data& primaryKey, int columnIndex)
         {
-            CHECK_NOT_INIT_THROW_ERROR("EasyDB::at(const Data& primaryKey, int columnIndex) : Not inited!");
+            IF_NOT_INIT_THROW_ERROR("EasyDB::at(const Data& primaryKey, int columnIndex) : Not inited!");
             if (columnIndex < 0 || columnIndex >= this->columnCount)
             { throw std::logic_error("EasyDB::at(const Data& primaryKey, int columnIndex) : Column index out of range!"); }
             if (this->table.find(primaryKey) == this->table.end())
@@ -864,7 +872,7 @@ namespace EDB
         }
         const Data& at(const Data& primaryKey, const std::string& columnName)
         {
-            CHECK_NOT_INIT_THROW_ERROR("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Not inited!");
+            IF_NOT_INIT_THROW_ERROR("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Not inited!");
             int columnIndex = this->toColumnIndex(columnName);
             if (columnIndex < 0)
             { throw std::logic_error("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Column not found!"); }
@@ -874,7 +882,7 @@ namespace EDB
         }
         RowViewType operator[](const Data& primaryKey)
         {
-            CHECK_NOT_INIT_THROW_ERROR("EasyDB::operator[](const Data& primaryKey) : Not inited!");
+            IF_NOT_INIT_THROW_ERROR("EasyDB::operator[](const Data& primaryKey) : Not inited!");
             // 类型检查
             IF_DATA_TYPE_NOT_MATCH(this->primaryKeyIndex, primaryKey)
             { throw std::logic_error("EasyDB::operator[](const Data& primaryKey) : primaryKey type not match!"); }
@@ -885,7 +893,7 @@ namespace EDB
         }
         std::vector<RowViewType> find(int columnIndex, const Data& inKey)
         {
-            CHECK_NOT_INIT_THROW_ERROR("EasyDB::find(int columnIndex, const Data& inKey) : Not inited!");
+            IF_NOT_INIT_THROW_ERROR("EasyDB::find(int columnIndex, const Data& inKey) : Not inited!");
             if (columnIndex == this->primaryKeyIndex)
             {
                 std::vector<RowViewType> res;
@@ -911,7 +919,7 @@ namespace EDB
         }
         std::vector<RowViewType> find(const std::string& columnName, const Data& inKey)
         {
-            CHECK_NOT_INIT_THROW_ERROR("EasyDB::find(const std::string& columnName, const Data& inKey) : Not inited!");
+            IF_NOT_INIT_THROW_ERROR("EasyDB::find(const std::string& columnName, const Data& inKey) : Not inited!");
             int columnIndex = this->toColumnIndex(columnName);
             if (columnIndex < 0)
             { throw std::logic_error("EasyDB::find(const std::string& columnName, const Data& inKey) : Column not found!"); }
@@ -919,19 +927,19 @@ namespace EDB
         }
         iterator begin()
         {
-            CHECK_NOT_INIT_THROW_ERROR("EasyDB::begin() : Not inited!");
+            IF_NOT_INIT_THROW_ERROR("EasyDB::begin() : Not inited!");
             return iterator{this->table.begin(), this};
         }
         iterator end()
         {
-            CHECK_NOT_INIT_THROW_ERROR("EasyDB::end() : Not inited!");
+            IF_NOT_INIT_THROW_ERROR("EasyDB::end() : Not inited!");
             return iterator{this->table.end(), this};
         }
 
         // 杂项
         int toColumnIndex(const std::string& columnName)
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             if (this->columnIndexMap.find(columnName) == this->columnIndexMap.end())
             {
                 return COLUMN_NOT_FOUND;
@@ -989,18 +997,18 @@ namespace EDB
         { return this->init; }
         int get_version() const
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             return this->version;
         }
         std::string get_table_name() const
         {
-            CHECK_NOT_INIT(this) return "";
+            IF_NOT_INIT(this) return "";
             if (this->version < 1) return "";
             return this->tableName;
         }
         int set_table_name(const std::string& newTableName)
         {
-            CHECK_NOT_INIT_RETURN_ERR_CODE
+            IF_NOT_INIT_RETURN_ERR_CODE
             if (this->version < 1) this->version = EDB_VERSION;
             this->tableName = newTableName;
             return SUCCESS;
