@@ -4,3 +4,58 @@ try.c
 PerformanceBench/
 .vscode
 build
+
+## Ignore Visual Studio temporary files, build results, and
+## user-specific files
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+ARM/
+ARM64/
+[Bb]uild/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+*.log
+*.obj
+*.pdb
+*.idb
+*.ipdb
+*.iobj
+*.ilk
+*.aps
+*.tlog
+*.lastbuildstate
+*.cache
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Visual Studio files
+.vs/
+*.ncb
+*.suo
+*.sln.docstates
+
+# Installer files
+*.msi
+*.cab
+*.exe
+setup/
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile

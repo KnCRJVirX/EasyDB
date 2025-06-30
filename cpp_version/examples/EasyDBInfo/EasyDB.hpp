@@ -474,7 +474,7 @@ namespace EDB {
             return SUCCESS;
         }
         // 文件读写
-        int create(const std::string& filename, const std::string& tableName, std::vector<EColumn> tableHead, const std::string& primaryKeyColumnName)
+        static int create(const std::string& filename, const std::string& tableName, std::vector<EColumn> tableHead, const std::string& primaryKeyColumnName)
         {
             size_t primaryKeyIndex = -1;
             for (size_t i = 0; i < tableHead.size(); i++) {
@@ -489,11 +489,11 @@ namespace EDB {
                 return FILE_OPEN_ERROR;
             }
             int32_t magicNum = EDB_MAGIC_NUMBER;
-            dbfile.write(reinterpret_cast<const char*>(&magicNum), sizeof(magicNum));
+            dbfile.write(reinterpret_cast<const char*>(&magicNum), sizeof(magicNum));   // 魔数
             int32_t ver = EDB_VERSION;
-            dbfile.write(reinterpret_cast<const char*>(&ver), 4);
+            dbfile.write(reinterpret_cast<const char*>(&ver), 4);                       // 版本号
             size_t emptyRowCount = 0;
-            dbfile.write(reinterpret_cast<const char*>(&emptyRowCount), EDB_INT_SIZE);
+            dbfile.write(reinterpret_cast<const char*>(&emptyRowCount), EDB_INT_SIZE);  // 行数
             size_t rowSize = 0;
             for (size_t i = 0; i < tableHead.size(); i++) {
                 switch (tableHead[i].dType) {
@@ -515,76 +515,82 @@ namespace EDB {
                     break;
                 }
             }
-            dbfile.write(reinterpret_cast<const char*>(&rowSize), EDB_INT_SIZE);
+            dbfile.write(reinterpret_cast<const char*>(&rowSize), EDB_INT_SIZE);            // 行长度
             size_t columnCount = tableHead.size();
-            dbfile.write(reinterpret_cast<const char*>(&columnCount), EDB_INT_SIZE);
-            for (auto& i : tableHead)
-            {
+            dbfile.write(reinterpret_cast<const char*>(&columnCount), EDB_INT_SIZE);        // 列数
+            // 每列数据类型
+            for (auto& i : tableHead) {
                 dbfile.write(reinterpret_cast<const char*>(&(i.dType)), EDB_INT_SIZE);
             }
-            for (auto& i : tableHead)
-            {
+            // 每列数据长度
+            for (auto& i : tableHead) {
                 dbfile.write(reinterpret_cast<const char*>(&(i.columnSize)), EDB_INT_SIZE);
             }
-            for (auto& i : tableHead)
-            {
+            // 列名
+            for (auto& i : tableHead) {
                 dbfile.write(i.columnName.data(), i.columnName.length() + 1);
             }
-            dbfile.write(tableName.data(), tableName.length() + 1);
-            dbfile.write(reinterpret_cast<const char*>(&primaryKeyIndex), EDB_INT_SIZE);
+            dbfile.write(tableName.data(), tableName.length() + 1);                         // 表名
+            dbfile.write(reinterpret_cast<const char*>(&primaryKeyIndex), EDB_INT_SIZE);    // 主键索引
             dbfile.close();
             return SUCCESS;
         }
         int open(const std::string& dbFilePath)
         {
-            IF_INIT(this) this->close();
+            IF_INIT(this){
+                this->closeNotSave();
+            }
+            // 记录文件名
             this->dbfilename = dbFilePath;
+            // 打开文件
             std::ifstream dbfile;
             dbfile.open(this->dbfilename, std::ios::in | std::ios::binary);
-            if (dbfile.fail() || !dbfile.is_open())
-            {
+            if (dbfile.fail() || !dbfile.is_open()) {
                 return FILE_OPEN_ERROR;
             }
+
+            // 读取文件头
+            // 魔数检查
             int32_t readMagicNum;
             dbfile.read(reinterpret_cast<char*>(&readMagicNum), 4);
-            if (readMagicNum != EDB_MAGIC_NUMBER)
-            {
+            if (readMagicNum != EDB_MAGIC_NUMBER){
                 return MAGIC_NUMBER_ERROR;
             }
-            dbfile.read(reinterpret_cast<char*>(&this->version), 4);
-            dbfile.read(reinterpret_cast<char*>(&this->rowCount), EDB_INT_SIZE);
-            dbfile.read(reinterpret_cast<char*>(&this->rowSize), EDB_INT_SIZE);
-            dbfile.read(reinterpret_cast<char*>(&this->columnCount), EDB_INT_SIZE);
+            dbfile.read(reinterpret_cast<char*>(&this->version), 4);                    // 版本号
+            dbfile.read(reinterpret_cast<char*>(&this->rowCount), EDB_INT_SIZE);        // 行数
+            dbfile.read(reinterpret_cast<char*>(&this->rowSize), EDB_INT_SIZE);         // 行长度
+            dbfile.read(reinterpret_cast<char*>(&this->columnCount), EDB_INT_SIZE);     // 列数
             this->dataTypes.resize(this->columnCount);
-            for (size_t i = 0; i < this->columnCount; i++)
-            {
+            // 每列数据类型
+            for (size_t i = 0; i < this->columnCount; i++) {
                 DataType tmp;
                 dbfile.read(reinterpret_cast<char*>(&tmp), EDB_INT_SIZE);
                 this->dataTypes[i] = tmp;
             }
+            // 每列数据长度
             this->dataSizes.resize(this->columnCount);
-            for (size_t i = 0; i < this->columnCount; i++)
-            {
+            for (size_t i = 0; i < this->columnCount; i++) {
                 size_t tmp;
                 dbfile.read(reinterpret_cast<char*>(&tmp), EDB_INT_SIZE);
                 this->dataSizes[i] = tmp;
             }
+            // 列名
             this->columnNames.resize(this->columnCount);
-            for (size_t i = 0; i < this->columnCount; i++)
-            {
+            for (size_t i = 0; i < this->columnCount; i++) {
                 char ch;
                 std::string tmpStr;
                 while ((ch = dbfile.get()) != '\0') tmpStr += ch;
                 this->columnNames[i] = tmpStr;
                 this->columnIndexMap[tmpStr] = i;
             }
+            // 版本大于1则读取表名
             if (this->version >= 1)
             {
                 char ch;
                 this->tableName.clear();
                 while ((ch = dbfile.get()) != '\0') this->tableName += ch;
             }
-            dbfile.read(reinterpret_cast<char*>(&this->primaryKeyIndex), EDB_INT_SIZE);
+            dbfile.read(reinterpret_cast<char*>(&this->primaryKeyIndex), EDB_INT_SIZE);     // 主键索引
             size_t offset = 0;
             this->dataOffset.resize(this->columnCount);
             for (size_t i = 0; i < this->columnCount; i++)
@@ -609,6 +615,8 @@ namespace EDB {
                 }
             }
             this->dataFileOffset = dbfile.tellg();
+
+            // 读取记录数据
             std::unique_ptr<char[]> lineBuffer{new char[this->rowSize]};
             std::vector<Data> row;
             row.resize(this->columnCount);
@@ -625,9 +633,11 @@ namespace EDB {
                     case EDB::DataType::REAL:
                         row[j] = *reinterpret_cast<double*>(lineBuffer.get() + this->dataOffset[j]);
                         break;
-                    case EDB::DataType::TEXT:
-                        row[j] = std::string(lineBuffer.get() + this->dataOffset[j], this->dataSizes[j]);
+                    case EDB::DataType::TEXT:{
+                        const char* textPtr = lineBuffer.get() + this->dataOffset[j];
+                        row[j] = std::string(textPtr, strlen(textPtr) < dataSizes[j] ? strlen(textPtr) : dataSizes[j]);
                         break;
+                    }
                     case EDB::DataType::BLOB:
                         row[j] = Blob{new char[this->dataSizes[j]]};
                         memcpy(std::get<Blob>(row[j]).get(), lineBuffer.get() + this->dataOffset[j], this->dataSizes[j]);

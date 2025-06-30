@@ -182,7 +182,8 @@ EasyDB& operator=(EasyDB&& other);      // 2
 ```
 
 (1) 拷贝赋值。
-(2) 移动赋值
+
+(2) 移动赋值。
 
 ##### 返回值
 
@@ -191,7 +192,7 @@ EasyDB& operator=(EasyDB&& other);      // 2
 #### EasyDB::create
 
 ```cpp
-int create(const std::string& filename, const std::string& tableName, std::vector<EColumn> tableHead, const std::string& primaryKeyColumnName);
+static int create(const std::string& filename, const std::string& tableName, std::vector<EColumn> tableHead, const std::string& primaryKeyColumnName);
 ```
 
 ##### 参数
@@ -252,6 +253,7 @@ int open(const std::string& dbFilePath);
 ##### 注解
 
 打开名为`dbFilePath`的EasyDB数据库文件。
+如果有已打开的数据库，会调用`EasyDB::closeNotSave()` 。
 
 #### EasyDB::close
 
