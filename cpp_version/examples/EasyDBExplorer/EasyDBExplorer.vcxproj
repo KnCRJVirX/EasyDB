@@ -166,6 +166,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -185,6 +186,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CreateEasyDBDlg.h" />
+    <ClInclude Include="D:\EdgeDownload\csv.h" />
     <ClInclude Include="EasyDB.hpp" />
     <ClInclude Include="EasyDBExplorer.h" />
     <ClInclude Include="EasyDBExplorerDlg.h" />

@@ -118,10 +118,9 @@ BOOL CEasyDBExplorerDlg::OnInitDialog()
 	// TODO: 在此添加额外的初始化代码
 
 	// 添加菜单
-	// 文件菜单
-	CMenu fileMenu;
-	fileMenu.LoadMenuW(IDR_MENU1);
-	SetMenu(&fileMenu);
+	CMenu menu;
+	menu.LoadMenuW(IDR_MENU1);
+	SetMenu(&menu);
 
 	// 接受文件拖拽
 	DragAcceptFiles(TRUE);
@@ -647,18 +646,21 @@ void CEasyDBExplorerDlg::OnBnClickedButton1()
 		{
 			PostRowToMainListView(row);
 		}
+		return;
 	}
 	// 获取搜索的列
 	int searchColIndex = columnComboBox.GetCurSel();
 	// 不搜索BLOB类型的列
 	if (edb.get_column_data_type(searchColIndex) == EDB::DataType::BLOB)
 	{
+		AfxMessageBox(TEXT("不支持搜索BLOB类型的列！"), MB_ICONWARNING | MB_OK);
 		return;
 	}
 	
 	// 清空ListView
 	mainListView.DeleteAllItems();
 
+	// 遍历搜索
 	for (auto row : edb)
 	{
 		std::stringstream ss;
