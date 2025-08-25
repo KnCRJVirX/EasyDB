@@ -1,4 +1,4 @@
-try.c
+test_*
 *.exe
 *.db
 PerformanceBench/

@@ -54,7 +54,7 @@
 #define IF_INIT(pEasyDB) if((pEasyDB)->is_init())
 #define IF_NOT_INIT(pEasyDB) if(!((pEasyDB)->is_init()))
 #define IF_NOT_INIT_RETURN_ERR_CODE do { IF_NOT_INIT(this) return NOT_INITED; } while(0);
-#define IF_NOT_INIT_THROW_ERROR(ERR_STRING) do { IF_NOT_INIT(this) throw std::logic_error((ERR_STRING)); } while(0)
+#define IF_NOT_INIT_THROW_ERROR(ERR_STRING) do { IF_NOT_INIT(this) throw EDB::not_inited((ERR_STRING)); } while(0)
 
 #define IF_DATA_TYPE_NOT_MATCH(COLINDEX, DATAREF) if ((this->dataTypes[(COLINDEX)] == EDB::DataType::INT && (DATAREF).index() != 0) || \
                                                         (this->dataTypes[(COLINDEX)] == EDB::DataType::REAL&& (DATAREF).index() != 1) || \
@@ -67,12 +67,28 @@ namespace EDB {
     class EasyDB;
     class ERowView;
 
+    // 存储数据类型
     using Int = int64_t;
     using Real = double;
     using Text = std::string;
     using Blob = std::shared_ptr<char[]>;
     using Data = std::variant<Int, Real, Text, Blob>;
 
+    // 异常类
+    class column_not_found : public std::out_of_range{
+        using std::out_of_range::out_of_range;
+    };
+    class key_not_found : public std::out_of_range{
+        using std::out_of_range::out_of_range;
+    };
+    class not_inited : public std::logic_error{
+        using std::logic_error::logic_error;
+    };
+    class type_not_match : public std::invalid_argument {
+        using std::invalid_argument::invalid_argument;
+    };
+
+    // 数据类型枚举
     enum class DataType : int64_t {
         ILLEGAL_TYPE = -1,
         INT = 0,
@@ -81,12 +97,14 @@ namespace EDB {
         TEXT = 9
     };
 
+    // 兼容EasyDB的数据对象基类
     class DataObject {
         public:
             virtual int edb_dump(EasyDB& edb) noexcept = 0;
             virtual int edb_load(ERowView rowView) noexcept = 0;
     };
 
+    // 列描述
     class EColumn {
         public:
             DataType dType;
@@ -188,7 +206,7 @@ namespace EDB {
         const_reference at(const std::string& columnName) const
         {
             if (columnNameMap->find(columnName) == columnNameMap->end())
-            { throw std::logic_error{"ERowView::operator[] : Column " + columnName + " not found."}; }
+            { throw column_not_found{"ERowView::operator[] : Column " + columnName + " not found."}; }
             return this->operator[](columnNameMap->at(columnName));
         }
         const_reference operator[](size_t columnIndex) const
@@ -196,7 +214,7 @@ namespace EDB {
         const_reference operator[](const std::string& columnName) const
         {
             if (columnNameMap->find(columnName) == columnNameMap->end())
-            { throw std::logic_error{"ERowView::operator[] : Column " + columnName + " not found."}; }
+            { throw column_not_found{"ERowView::operator[] : Column " + columnName + " not found."}; }
             return this->operator[](columnNameMap->at(columnName));
         }
         size_type size() const
@@ -245,26 +263,23 @@ namespace EDB {
         using InternalIterType = typename _EasyDB::TableType::iterator;
     private:
         const _EasyDB* _db;
-        InternalIterType _it, _it_next;
+        InternalIterType _it;
     public:
         EasyDBIterator() : _it(){};
-        EasyDBIterator(const InternalIterType& i, const _EasyDB* _InDB) : _db(_InDB), _it(i) {
-            this->_it_next = i;
-            if (i != _db->table.end()) ++this->_it_next;
-        };
+        EasyDBIterator(const InternalIterType& i, const _EasyDB* _InDB) : _db(_InDB), _it(i) {};
         EasyDBIterator(const EasyDBIterator& other)
         { 
             this->_db = other._db;
             this->_it = other._it;
-            this->_it_next = this->_it;
-            if (this->_it != _db->table.end()) ++this->_it_next;
         }
         EasyDBIterator& operator=(const EasyDBIterator& other)
-        { this->_it = other._it; }
+        {
+            this->_db = other._db;
+            this->_it = other._it;
+        }
         EasyDBIterator& operator++()
         {
-            _it = _it_next;
-            if (_it_next != _db->table.end()) ++_it_next;
+            ++_it;
             return *this;
         }
         EasyDBIterator operator++(int)
@@ -275,7 +290,7 @@ namespace EDB {
         }
         EasyDBIterator& operator--()
         {
-            _it = _it_next--;
+            --_it;
             return *this;
         }
         EasyDBIterator operator--(int)
@@ -285,9 +300,9 @@ namespace EDB {
             return _tmp;
         }
         bool operator==(const EasyDBIterator& other)
-        { return (this->_it == other._it); }
+        { return (this->_it == other._it && this->_db == other._db); }
         bool operator!=(const EasyDBIterator& other)
-        { return (this->_it != other._it); }
+        { return (this->_it != other._it || this->_db != other._db); }
         RowViewType operator*()
         { return RowViewType{_it->second, _db->columnIndexMap}; }
     };
@@ -352,7 +367,7 @@ namespace EDB {
         EasyDB(const EasyDB& other)
         {
             if (!other.init) {
-                throw std::logic_error("EasyDB::EasyDB(const EasyDB& other): EasyDB object can not be constructed from another uninitialized object.");
+                throw not_inited("EasyDB::EasyDB(const EasyDB& other): EasyDB object can not be constructed from another uninitialized object.");
             }
             init = true;
             dbfilename = other.dbfilename;
@@ -400,7 +415,7 @@ namespace EDB {
         EasyDB& operator=(const EasyDB& other)
         {
             if (!other.init) {
-                throw std::logic_error("EasyDB::EasyDB(const EasyDB& other): EasyDB object can not be constructed from another uninitialized object.");
+                throw not_inited("EasyDB::EasyDB(const EasyDB& other): EasyDB object can not be constructed from another uninitialized object.");
             }
             IF_INIT(this) {
                 this->close();
@@ -425,7 +440,7 @@ namespace EDB {
         EasyDB& operator=(EasyDB&& other)
         {
             if (!other.init) {
-                throw std::logic_error("EasyDB::EasyDB(const EasyDB& other): EasyDB object can not be constructed from another uninitialized object.");
+                throw not_inited("EasyDB::EasyDB(const EasyDB& other): EasyDB object can not be constructed from another uninitialized object.");
             }
             IF_INIT(this) {
                 this->close();
@@ -850,16 +865,16 @@ namespace EDB {
         {
             IF_NOT_INIT_THROW_ERROR("EasyDB::at(const Data& primaryKey) : Not inited!");
             if (this->table.find(primaryKey) == this->table.end())
-            { throw std::logic_error("EasyDB::at(const Data& primaryKey) : Key not found!"); }
+            { throw key_not_found("EasyDB::at(const Data& primaryKey) : Key not found!"); }
             return EDB::EasyDB::RowViewType{table[primaryKey], this->columnIndexMap};
         }
         virtual const Data& at(const Data& primaryKey, int columnIndex) const
         {
             IF_NOT_INIT_THROW_ERROR("EasyDB::at(const Data& primaryKey, int columnIndex) : Not inited!");
             if (columnIndex < 0 || columnIndex >= this->columnCount)
-            { throw std::logic_error("EasyDB::at(const Data& primaryKey, int columnIndex) : Column index out of range!"); }
+            { throw std::out_of_range("EasyDB::at(const Data& primaryKey, int columnIndex) : Column index out of range!"); }
             if (this->table.find(primaryKey) == this->table.end())
-            { throw std::logic_error("EasyDB::at(const Data& primaryKey, int columnIndex) : Key not found!"); }
+            { throw key_not_found("EasyDB::at(const Data& primaryKey, int columnIndex) : Key not found!"); }
             return this->table.at(primaryKey).at(columnIndex);
         }
         virtual const Data& at(const Data& primaryKey, const std::string& columnName) const
@@ -867,9 +882,9 @@ namespace EDB {
             IF_NOT_INIT_THROW_ERROR("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Not inited!");
             int columnIndex = this->toColumnIndex(columnName);
             if (columnIndex < 0)
-            { throw std::logic_error("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Column not found!"); }
+            { throw column_not_found("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Column not found!"); }
             if (this->table.find(primaryKey) == this->table.end())
-            { throw std::logic_error("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Key not found!"); }
+            { throw key_not_found("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Key not found!"); }
             return this->table.at(primaryKey).at(columnIndex);
         }
         virtual RowViewType operator[](const Data& primaryKey)
@@ -877,9 +892,9 @@ namespace EDB {
             IF_NOT_INIT_THROW_ERROR("EasyDB::operator[](const Data& primaryKey) : Not inited!");
             // 类型检查
             IF_DATA_TYPE_NOT_MATCH(this->primaryKeyIndex, primaryKey)
-            { throw std::logic_error("EasyDB::operator[](const Data& primaryKey) : primaryKey type not match!"); }
+            { throw type_not_match("EasyDB::operator[](const Data& primaryKey) : primaryKey type not match!"); }
             if (this->table.find(primaryKey) == this->table.end())
-            { throw std::logic_error("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Key not found!"); }
+            { throw key_not_found("EasyDB::at(const Data& primaryKey, const std::string& columnName) : Key not found!"); }
             return EDB::EasyDB::RowViewType{table[primaryKey], this->columnIndexMap};
         }
 
@@ -894,9 +909,9 @@ namespace EDB {
                 return res;
             }
             if (columnIndex < 0 || columnIndex >= this->columnCount)
-            { throw std::logic_error("EasyDB::find(int columnIndex, const Data& inKey) : Column index out of range!"); }
+            { throw std::out_of_range("EasyDB::find(int columnIndex, const Data& inKey) : Column index out of range!"); }
             IF_DATA_TYPE_NOT_MATCH(columnIndex, inKey)
-            { throw std::logic_error("EasyDB::find(int columnIndex, const Data& inKey) : Data type not match!"); }
+            { throw type_not_match("EasyDB::find(int columnIndex, const Data& inKey) : Data type not match!"); }
             std::vector<RowViewType> res;
             for (auto& [primaryKey, row] : this->table) {
                 if (row[columnIndex] == inKey) {
@@ -910,7 +925,7 @@ namespace EDB {
             IF_NOT_INIT_THROW_ERROR("EasyDB::find(const std::string& columnName, const Data& inKey) : Not inited!");
             int columnIndex = this->toColumnIndex(columnName);
             if (columnIndex < 0)
-            { throw std::logic_error("EasyDB::find(const std::string& columnName, const Data& inKey) : Column not found!"); }
+            { throw column_not_found("EasyDB::find(const std::string& columnName, const Data& inKey) : Column not found!"); }
             return this->find(columnIndex, inKey);
         }
         iterator begin()
@@ -972,14 +987,14 @@ namespace EDB {
         DataType get_column_data_type(int columnIndex)
         {
             if (columnIndex < 0 || columnIndex >= this->columnCount)
-            { throw std::logic_error("EasyDB::get_column_data_type(int columnIndex) : Column index out of range!"); }
+            { throw std::out_of_range("EasyDB::get_column_data_type(int columnIndex) : Column index out of range!"); }
             return this->dataTypes[columnIndex];
         }
         DataType get_column_data_type(const std::string& columnName)
         {
             int colIndex = this->toColumnIndex(columnName);
             if (colIndex < 0 || colIndex >= this->columnCount)
-            { throw std::logic_error("EasyDB::get_column_data_type(const std::string& columnName) : Column not found!"); }
+            { throw column_not_found("EasyDB::get_column_data_type(const std::string& columnName) : Column not found!"); }
             return this->get_column_data_type(colIndex);
         }
         bool hasrow(const Data& primaryKey)
@@ -1061,7 +1076,7 @@ namespace EDB {
             if (hasrow(primaryKey)) {
                 return T{at(primaryKey)};
             } else {
-                throw std::logic_error("Key not found");
+                throw key_not_found("EasyDB::load(const EDB::Data& primaryKey): Key not found");
             }
         }
         template <typename T>
@@ -1070,6 +1085,8 @@ namespace EDB {
             T obj{};
             if (hasrow(primaryKey)) {
                 obj.edb_load(at(primaryKey));
+            } else {
+                throw key_not_found("EasyDB::load(const EDB::Data& primaryKey): Key not found");
             }
             return obj;
         }
